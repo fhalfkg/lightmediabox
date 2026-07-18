@@ -1,1 +1,9 @@
 node_modules/
+dist/
+hls_temp/
+public/thumbnails/
+media/
+*.db
+*.sqlite
+config.json
+.env

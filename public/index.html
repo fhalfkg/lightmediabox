@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <title>LightMediaBox</title>
+    <meta name="description" content="LightMediaBox - 개인 미디어 서버 플레이어">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+    <script src="https://unpkg.com/@simplewebauthn/browser/dist/bundle/index.umd.min.js"></script>
+    <link rel="stylesheet" href="styles.css?v=2">
+</head>
+
+<body>
+
+    <!-- ─── 라이브러리 뷰 ─── -->
+    <div id="library-view" class="hidden">
+        <div id="library-header">
+            <div class="header-top">
+                <h1>LightMediaBox</h1>
+                <div class="header-top-right">
+                    <div class="view-tabs">
+                        <button id="tab-folder" class="view-tab active">폴더</button>
+                        <button id="tab-video" class="view-tab">비디오</button>
+                    </div>
+                    <button id="btn-logout" class="text-btn" title="로그아웃">
+                        <svg viewBox="0 0 24 24">
+                            <path
+                                d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" />
+                        </svg>
+                        로그아웃
+                    </button>
+                    <button id="btn-settings" class="icon-btn" title="설정">
+                        <svg viewBox="0 0 24 24">
+                            <path
+                                d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.06-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.73,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.06,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.49-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="header-toolbar">
+                <div id="path-bar">
+                    <button id="btn-back" title="뒤로 가기" style="display:none">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+                        </svg>
+                        상위 폴더
+                    </button>
+                    <span id="current-path">📂 루트</span>
+                </div>
+                <div class="sort-controls">
+                    <select id="sort-select">
+                        <option value="name">이름순</option>
+                        <option value="duration">시간순</option>
+                        <option value="size">용량순</option>
+                        <option value="resolution">해상도순</option>
+                    </select>
+                    <button id="btn-sort-order" class="asc" title="정렬 순서 전환">
+                        <svg class="icon-asc" viewBox="0 0 24 24">
+                            <path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z" />
+                        </svg>
+                        <svg class="icon-desc" viewBox="0 0 24 24" style="display:none">
+                            <path d="M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div id="library-grid">
+            <div class="empty-grid">불러오는 중...</div>
+        </div>
+    </div>
+
+    <!-- ─── 설정 모달 ─── -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content settings-layout">
+            <button id="btn-settings-close" class="btn-icon close-modal-btn" title="닫기">
+                <svg viewBox="0 0 24 24">
+                    <path
+                        d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                </svg>
+            </button>
+            <div class="settings-sidebar">
+                <h2>설정</h2>
+                <div class="settings-tabs">
+                    <button class="settings-tab active" data-target="settings-account">계정 정보</button>
+                    <button class="settings-tab" data-target="settings-library">라이브러리</button>
+                </div>
+            </div>
+            <div class="settings-main">
+                <!-- 계정 정보 설정 -->
+                <div id="settings-account" class="settings-pane active">
+                    <h3>계정 정보</h3>
+                    <div class="form-group" style="margin-top: 16px;">
+                        <label>로그인 아이디</label>
+                        <input type="text" id="display-username" disabled class="auth-input"
+                            style="background: rgba(255,255,255,0.02); color: #fff;">
+                    </div>
+
+                    <div class="form-group" style="margin-top: 24px;">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <label style="margin: 0;">등록된 패스키</label>
+                            <button id="btn-add-passkey" class="btn-primary"
+                                style="padding: 6px 12px; font-size: 13px;">+ 패스키 추가</button>
+                        </div>
+                        <div id="passkeys-list-container"
+                            style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+                            <!-- 패스키 리스트 로드 위치 -->
+                            <div style="color: #a1a1aa; font-size: 13px;">불러오는 중...</div>
+                        </div>
+                        <small style="margin-top: 8px; display: block;">보안을 위해 최소 1개의 패스키는 유지해야 합니다.</small>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.1);">
+                        <label style="margin-bottom: 12px; display: block;">비밀번호 변경</label>
+                        <form id="form-change-password" target="dummyframe" action="about:blank">
+                            <input type="text" id="change-pwd-username" autocomplete="username" style="display:none">
+                            <input type="password" id="current-password" placeholder="현재 비밀번호" required class="auth-input" autocomplete="current-password">
+                            <input type="password" id="new-password" placeholder="새 비밀번호" required class="auth-input" autocomplete="new-password">
+                            <button type="submit" class="btn-primary" style="width: 100%; margin-top: 8px;">비밀번호 변경</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 라이브러리 설정 -->
+                <div id="settings-library" class="settings-pane">
+                    <h3>라이브러리 설정</h3>
+                    <div class="form-group" style="margin-top: 16px;">
+                        <label for="input-media-dir">라이브러리 미디어 경로</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" id="input-media-dir" placeholder="예: C:\Users\bin36\Videos"
+                                style="flex: 1;">
+                            <button id="btn-browse-path" class="btn-secondary">찾아보기</button>
+                        </div>
+                        <div id="system-browser"
+                            style="display: none; flex-direction: column; gap: 8px; margin-top: 8px; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 8px; max-height: 250px; overflow-y: auto;">
+                            <!-- 폴더 목록이 여기에 로드됩니다 -->
+                        </div>
+                        <small>경로를 변경하면 데이터베이스와 썸네일이 초기화되고 새로 스캔합니다.</small>
+                    </div>
+                    <div class="modal-actions" style="margin-top: 24px;">
+                        <button id="btn-settings-save" class="btn-primary">변경사항 저장</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── 인증 뷰 (로그인/가입) ─── -->
+    <div id="auth-view">
+        <div class="auth-box">
+            <h1
+                style="font-size: 28px; font-weight: 700; margin-bottom: 24px; background: linear-gradient(135deg, #a78bfa, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                LightMediaBox</h1>
+
+            <div id="auth-setup-form" style="display: none;">
+                <h2 style="font-size: 18px; margin-bottom: 8px;">환영합니다!</h2>
+                <p style="font-size: 14px; color: #a1a1aa; margin-bottom: 24px;">관리자 계정을 생성하여 시작하세요.</p>
+                <form id="form-register">
+                    <input type="text" id="reg-username" placeholder="아이디" required class="auth-input">
+                    <input type="password" id="reg-password" placeholder="비밀번호" required class="auth-input">
+                    <button type="submit" class="btn-primary" style="width: 100%; margin-top: 16px;">가입하기</button>
+                </form>
+            </div>
+
+            <div id="auth-login-form" style="display: none;">
+                <h2 style="font-size: 18px; margin-bottom: 24px;">로그인</h2>
+                <iframe name="dummyframe" id="dummyframe" style="display: none;"></iframe>
+                <form id="form-login" target="dummyframe" action="about:blank">
+                    <input type="text" id="login-username" placeholder="아이디" required class="auth-input">
+                    <input type="password" id="login-password" placeholder="비밀번호" required class="auth-input">
+                    <button type="submit" class="btn-primary" style="width: 100%; margin-top: 16px;">로그인</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── 플레이어 뷰 ─── -->
+    <div id="player-view" class="hidden">
+        <div id="player-wrapper">
+            <!-- 닫기 버튼 -->
+            <button id="btn-close-player" title="라이브러리로 돌아가기">
+                <svg viewBox="0 0 24 24">
+                    <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+                </svg>
+                뒤로 가기
+            </button>
+
+            <video id="video-player" playsinline></video>
+
+            <!-- 로딩 오버레이 -->
+            <div id="loading-overlay">
+                <div class="spinner"></div>
+                <p id="loading-text">화질 변환 중...</p>
+            </div>
+
+            <!-- 중앙 재생 버튼 -->
+            <div id="center-play">
+                <div class="play-circle">
+                    <svg viewBox="0 0 24 24">
+                        <polygon points="6,3 20,12 6,21" />
+                    </svg>
+                </div>
+            </div>
+
+            <!-- 컨트롤 오버레이 -->
+            <div id="controls-overlay">
+                <!-- 프로그레스 바 -->
+                <div id="progress-container">
+                    <div id="progress-bar">
+                        <div id="progress-buffered"></div>
+                        <div id="progress-played"></div>
+                        <div id="progress-thumb"></div>
+                    </div>
+                </div>
+
+                <!-- 버튼 행 -->
+                <div id="controls-row">
+                    <!-- 재생/정지 -->
+                    <button class="ctrl-btn" id="btn-play" title="재생/일시정지 (Space)">
+                        <svg id="icon-play" viewBox="0 0 24 24">
+                            <polygon points="6,3 20,12 6,21" />
+                        </svg>
+                        <svg id="icon-pause" viewBox="0 0 24 24" style="display:none">
+                            <rect x="5" y="3" width="4" height="18" />
+                            <rect x="15" y="3" width="4" height="18" />
+                        </svg>
+                    </button>
+
+                    <!-- 볼륨 -->
+                    <div id="volume-group">
+                        <button class="ctrl-btn" id="btn-mute" title="음소거 (M)">
+                            <svg id="icon-vol" viewBox="0 0 24 24">
+                                <path
+                                    d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+                            </svg>
+                            <svg id="icon-muted" viewBox="0 0 24 24" style="display:none">
+                                <path
+                                    d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
+                            </svg>
+                        </button>
+                        <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="1">
+                    </div>
+
+                    <!-- 시간 -->
+                    <span id="time-display">0:00 / 0:00</span>
+
+                    <div class="spacer"></div>
+
+                    <!-- 반복 재생 -->
+                    <button class="ctrl-btn" id="btn-repeat" title="영상 반복">
+                        <svg viewBox="0 0 24 24">
+                            <path
+                                d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm-4-2V9h-1l-2 1v1h1.5v4H13z" />
+                        </svg>
+                    </button>
+
+                    <!-- 화질 -->
+                    <div id="quality-menu-wrapper">
+                        <button class="ctrl-btn" id="btn-quality" title="화질 선택">
+                            <svg viewBox="0 0 24 24">
+                                <path
+                                    d="M19.14,12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94L14.4,2.81c-.04-.24-.24-.41-.48-.41h-3.84c-.24,0-.43.17-.47.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-.22-.08-.47,0-.59.22L2.74,8.87C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s.02,.63,.06,.94l-2.03,1.58c-.18,.14-.23,.41-.12,.61l1.92,3.32c.12,.22,.37,.29,.59,.22l2.39-.96c.5,.38,1.03,.7,1.62,.94l.36,2.54c.05,.24,.24,.41,.48,.41h3.84c.24,0,.44-.17,.47-.41l.36-2.54c.59-.24,1.13-.56,1.62-.94l2.39,.96c.22,.08,.47,0,.59-.22l1.92-3.32c.12-.22,.07-.47-.12-.61L19.14,12.94zM12,15.6c-1.98,0-3.6-1.62-3.6-3.6s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z" />
+                            </svg>
+                        </button>
+                        <div id="quality-menu">
+                            <div class="menu-title">화질</div>
+                        </div>
+                    </div>
+
+                    <!-- PIP -->
+                    <button class="ctrl-btn" id="btn-pip" title="PIP 모드 (P)">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M19 7h-8v6h8V7zm2-4H3c-1.1 0-2 .9-2 2v14c0 1.1.9 1.98 2 1.98h18c1.1 0 2-.88 2-1.98V5c0-1.1-.9-2-2-2zm0 16.01H3V4.98h18v14.03z"/>
+                        </svg>
+                    </button>
+
+                    <!-- 전체화면 -->
+                    <button class="ctrl-btn" id="btn-fullscreen" title="전체화면 (F)">
+                        <svg id="icon-fs-enter" viewBox="0 0 24 24">
+                            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
+                        </svg>
+                        <svg id="icon-fs-exit" viewBox="0 0 24 24" style="display:none">
+                            <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── 글로벌 UI 컴포넌트 ─── -->
+    <!-- 토스트 알림 컨테이너 -->
+    <div id="toast-container"></div>
+
+    <!-- 커스텀 다이얼로그 모달 -->
+    <div id="custom-dialog" class="modal">
+        <div class="modal-content" style="width: 320px; padding: 24px; text-align: center;">
+            <h3 id="dialog-title" style="margin-bottom: 12px; font-size: 18px;"></h3>
+            <p id="dialog-message" style="color: #a1a1aa; font-size: 14px; margin-bottom: 20px; word-break: keep-all;"></p>
+            <input type="text" id="dialog-input" class="auth-input" style="display: none; margin-bottom: 20px;" autocomplete="off">
+            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                <button id="btn-dialog-cancel" class="btn-secondary" style="flex: 1;">취소</button>
+                <button id="btn-dialog-confirm" class="btn-primary" style="flex: 1;">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="main.js?v=5"></script>
+</body>
+
+</html>
