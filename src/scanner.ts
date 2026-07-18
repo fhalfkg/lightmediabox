@@ -72,16 +72,35 @@ export const getThumbnailPath = (id: number | string) => {
  * FFprobe를 사용하여 메타데이터 추출 (Duration 등)
  */
 const extractMetadata = (filePath: string): Promise<any> => {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         ffmpeg.ffprobe(filePath, (err, metadata) => {
-            if (err) return reject(err);
+            if (err) {
+                console.warn(`⚠️ 메타데이터 추출 실패 (강제 등록됨): ${path.basename(filePath)} - ${err.message.split('\n')[0]}`);
+                let size = 0;
+                try { size = fs.statSync(filePath).size; } catch (e) { }
+                return resolve({
+                    duration: 0,
+                    size: size,
+                    container: path.extname(filePath).replace('.', ''),
+                    videoCodec: 'unknown',
+                    audioCodec: 'unknown',
+                    resolution: 'unknown',
+                });
+            }
 
             const videoStream = metadata.streams.find((s) => s.codec_type === 'video');
             const audioStream = metadata.streams.find((s) => s.codec_type === 'audio');
             const format = metadata.format;
 
             if (!videoStream) {
-                return reject(new Error('비디오 스트림을 찾을 수 없습니다.'));
+                return resolve({
+                    duration: format.duration || 0,
+                    size: format.size || 0,
+                    container: format.format_name || path.extname(filePath).replace('.', ''),
+                    videoCodec: 'unknown',
+                    audioCodec: audioStream?.codec_name || 'none',
+                    resolution: 'unknown',
+                });
             }
 
             resolve({
@@ -149,7 +168,7 @@ const generateMissingThumbnails = async () => {
             }
 
             if (!fs.existsSync(thumbInfo.absolutePath) && fs.existsSync(video.file_path)) {
-                scannerQueue.add(() => generateThumbnail(video.file_path, video.id).catch(() => {}));
+                scannerQueue.add(() => generateThumbnail(video.file_path, video.id).catch(() => { }));
             }
         }
     } catch (err) {
@@ -215,7 +234,7 @@ export const startScanner = () => {
                     if (existing) {
                         console.log(`➡️ 기존에 존재하는 비디오: ${path.basename(filePath)}`);
                         // 파일은 있는데 썸네일이 없을 수 있으므로 큐에 생성 작업 추가
-                        scannerQueue.add(() => generateThumbnail(filePath, existing.id).catch(() => {}));
+                        scannerQueue.add(() => generateThumbnail(filePath, existing.id).catch(() => { }));
                         return;
                     }
 
@@ -241,7 +260,7 @@ export const startScanner = () => {
                     try {
                         const result = insert();
                         // 썸네일 생성 작업 큐에 추가
-                        scannerQueue.add(() => generateThumbnail(filePath, result.lastInsertRowid).catch(() => {}));
+                        scannerQueue.add(() => generateThumbnail(filePath, result.lastInsertRowid).catch(() => { }));
                     } catch (insertError: any) {
                         if (insertError.code === 'SQLITE_CONSTRAINT_UNIQUE') {
                             console.log(`➡️ 이미 등록된 비디오 (중복 무시됨): ${fileName}`);
