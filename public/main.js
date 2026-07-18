@@ -235,6 +235,17 @@ async function browsePath(targetPath) {
     currentViewMode = 'folder';
     updateTabsUI();
 
+    const pathBar = document.getElementById('path-bar');
+    pathBar.style.display = 'flex';
+    if (currentBrowsePath) {
+        btnBackFolder.style.display = 'flex';
+        const parts = currentBrowsePath.split('/');
+        currentPathEl.innerHTML = `📂 ${parts.join(' / ')}`;
+    } else {
+        btnBackFolder.style.display = 'none';
+        currentPathEl.innerHTML = '📂 루트';
+    }
+
     showLoading();
     try {
         const res = await fetch(`/api/browse?path=${encodeURIComponent(targetPath)}`);
@@ -299,11 +310,15 @@ function renderLibrary() {
         const card = document.createElement('div');
         card.className = 'media-card video-card';
 
-        const thumbUrl = (video.thumbnail_url || `/thumbnails/${video.id}.jpg`) + '?v=1';
+        let thumbHtml = '<div class="fallback-icon">🎬</div>';
+        if (video.thumbnail_url) {
+            thumbHtml += `<img class="thumb-bg" src="${video.thumbnail_url}?v=1" alt="thumbnail" onerror="this.parentElement.classList.add('no-thumb');">`;
+        } else {
+            card.classList.add('no-thumb');
+        }
 
         card.innerHTML = `
-                    <div class="fallback-icon">🎬</div>
-                    <img class="thumb-bg" src="${thumbUrl}" alt="thumbnail" onerror="this.parentElement.classList.add('no-thumb');">
+                    ${thumbHtml}
                     <div class="card-info">
                         <div class="card-title">${video.file_name}</div>
                         <div class="card-meta">
@@ -404,7 +419,7 @@ function loadQuality(quality) {
     // Direct Play 지원 여부에 따라 분기
     if (quality === 'original' && isDirectPlaySupported) {
         console.log('⚡ Direct Play 모드로 스트리밍 (TS 변환 없음)');
-        videoPlayer.src = `/api/video/${currentVideoId}/direct`;
+        videoPlayer.src = `/api/video/${currentVideoId}/direct?token=${window.streamToken || ''}`;
         if (savedTime > 0) {
             videoPlayer.currentTime = savedTime;
         }
@@ -422,7 +437,7 @@ function loadQuality(quality) {
     }
 
     // HLS 트랜스코딩 / 리먹싱 (Direct Play가 불가능하거나 480p 등을 선택한 경우)
-    const m3u8Url = `/api/hls/${currentVideoId}/${quality}/index.m3u8`;
+    const m3u8Url = `/api/hls/${currentVideoId}/${quality}/index.m3u8?token=${window.streamToken || ''}`;
 
     // Safari(Mac/iOS)의 경우 네이티브 HLS 지원이 훨씬 안정적이므로 최우선으로 사용합니다.
     if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
@@ -1106,6 +1121,14 @@ async function checkAuthStatus() {
             authView.classList.add('hidden');
             libraryView.classList.remove('hidden');
 
+            try {
+                const tokenRes = await fetch('/api/auth/stream-token');
+                const tokenData = await tokenRes.json();
+                window.streamToken = tokenData.token;
+            } catch (e) {
+                console.error('스트리밍 토큰 발급 실패', e);
+            }
+
             // 모바일 사파리 등에서 로그인 시 OS 키보드/줌 때문에 내려간 스크롤을 최상단으로 복구
             // WebAuthn UI 종료 및 화면 렌더링 후 적용되도록 충분한 지연 시간 확보 (300ms)
             setTimeout(() => window.scrollTo(0, 0), 300);
@@ -1251,3 +1274,85 @@ btnLogout.onclick = async () => {
 
 // 앱 초기화 시작
 checkAuthStatus();
+
+// ─── AirPlay & Chromecast 지원 ───
+
+const btnAirplay = document.getElementById('btn-airplay');
+const btnCastWrapper = document.getElementById('btn-cast-wrapper');
+
+// 1. AirPlay (Safari 전용)
+if (window.WebKitPlaybackTargetAvailabilityEvent) {
+    videoPlayer.addEventListener('webkitplaybacktargetavailabilitychanged', function(event) {
+        if (event.availability === 'available') {
+            btnAirplay.style.display = 'block';
+        } else {
+            btnAirplay.style.display = 'none';
+        }
+    });
+
+    btnAirplay.addEventListener('click', function() {
+        videoPlayer.webkitShowPlaybackTargetPicker();
+    });
+}
+
+// 2. Google Cast (Chromecast)
+let castSession = null;
+
+window.__onGCastApiAvailable = function(isAvailable) {
+    if (isAvailable) {
+        initializeCastApi();
+    }
+};
+
+function initializeCastApi() {
+    cast.framework.CastContext.getInstance().setOptions({
+        receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+        autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
+    });
+
+    btnCastWrapper.style.display = 'inline-block';
+
+    const context = cast.framework.CastContext.getInstance();
+    context.addEventListener(cast.framework.CastContextEventType.SESSION_STATE_CHANGED, function(event) {
+        if (event.sessionState === cast.framework.SessionState.SESSION_STARTED || event.sessionState === cast.framework.SessionState.SESSION_RESUMED) {
+            castSession = context.getCurrentSession();
+            castCurrentVideo();
+        } else if (event.sessionState === cast.framework.SessionState.SESSION_ENDED) {
+            castSession = null;
+        }
+    });
+}
+
+function castCurrentVideo() {
+    if (!castSession || !currentVideoId) return;
+
+    const origin = window.location.origin;
+    let url = '';
+    
+    // HLS.js나 native 플레이어에 공급되는 url과 동일하게 전송
+    if (currentQuality === 'original') {
+        url = `${origin}/api/video/${currentVideoId}/direct?token=${window.streamToken || ''}`;
+    } else {
+        url = `${origin}/api/hls/${currentVideoId}/${currentQuality}/index.m3u8?token=${window.streamToken || ''}`;
+    }
+
+    const mediaInfo = new chrome.cast.media.MediaInfo(url, currentQuality === 'original' ? 'video/mp4' : 'application/x-mpegURL');
+    
+    const videoData = allVideos.find(v => String(v.id) === String(currentVideoId));
+    if (videoData) {
+        const metadata = new chrome.cast.media.GenericMediaMetadata();
+        metadata.title = videoData.file_name;
+        mediaInfo.metadata = metadata;
+    }
+
+    const request = new chrome.cast.media.LoadRequest(mediaInfo);
+    request.currentTime = videoPlayer.currentTime;
+
+    castSession.loadMedia(request).then(
+        function() { 
+            console.log('✅ 크롬캐스트로 전송 완료'); 
+            videoPlayer.pause();
+        },
+        function(e) { console.error('❌ 크롬캐스트 전송 에러', e); }
+    );
+}

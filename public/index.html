@@ -11,7 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
     <script src="https://unpkg.com/@simplewebauthn/browser/dist/bundle/index.umd.min.js"></script>
-    <link rel="stylesheet" href="styles.css?v=2">
+    <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
+    <link rel="stylesheet" href="styles.css?v=3">
 </head>
 
 <body>
@@ -270,6 +271,18 @@
                         <div id="quality-menu">
                             <div class="menu-title">화질</div>
                         </div>
+                    </div>
+
+                    <!-- AirPlay -->
+                    <button class="ctrl-btn" id="btn-airplay" title="AirPlay" style="display:none">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M6 22h12l-6-6zM21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4v-2H3V5h18v14h-4v2h4c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
+                        </svg>
+                    </button>
+
+                    <!-- Chromecast -->
+                    <div class="ctrl-btn" id="btn-cast-wrapper" style="display:none">
+                        <google-cast-launcher style="width: 24px; height: 24px; display: inline-block; cursor: pointer;"></google-cast-launcher>
                     </div>
 
                     <!-- PIP -->

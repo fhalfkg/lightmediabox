@@ -7,6 +7,7 @@ import { startScanner } from './scanner';
 import routes from './routes';
 import authRoutes from './auth';
 import db from './db';
+import jwt from 'jsonwebtoken';
 
 const SqliteStore = require('better-sqlite3-session-store')(session);
 
@@ -39,10 +40,22 @@ app.use('/api/auth', authRoutes);
 
 // API 보안 미들웨어 (인증되지 않은 요청 차단)
 app.use('/api', (req, res, next) => {
-    if (!req.session.userId) {
-        return res.status(401).json({ error: '인증이 필요합니다.' });
+    if (req.session.userId) {
+        return next();
     }
-    next();
+
+    const token = req.query.token as string;
+    if (token) {
+        try {
+            const secret = process.env.SESSION_SECRET || 'default_secret_key';
+            jwt.verify(token, secret);
+            return next();
+        } catch (err) {
+            return res.status(401).json({ error: '유효하지 않은 토큰입니다.' });
+        }
+    }
+
+    return res.status(401).json({ error: '인증이 필요합니다.' });
 });
 
 // 스캐너 실행

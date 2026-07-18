@@ -174,7 +174,8 @@ router.get('/videos', (req, res) => {
     videos.forEach(video => {
         const hash = crypto.createHash('md5').update(video.id.toString()).digest('hex');
         const folderName = hash.substring(0, 2);
-        video.thumbnail_url = `/thumbnails/${folderName}/${hash}.jpg`;
+        const thumbPath = path.join(process.cwd(), 'public', 'thumbnails', folderName, `${hash}.jpg`);
+        video.thumbnail_url = fs.existsSync(thumbPath) ? `/thumbnails/${folderName}/${hash}.jpg` : undefined;
     });
     res.json(videos);
 });
@@ -215,7 +216,10 @@ router.get('/browse', (req, res) => {
                 if (randomVideo) {
                     const hash = crypto.createHash('md5').update(randomVideo.id.toString()).digest('hex');
                     const hashFolder = hash.substring(0, 2);
-                    thumbnail_url = `/thumbnails/${hashFolder}/${hash}.jpg`;
+                    const thumbPath = path.join(process.cwd(), 'public', 'thumbnails', hashFolder, `${hash}.jpg`);
+                    if (fs.existsSync(thumbPath)) {
+                        thumbnail_url = `/thumbnails/${hashFolder}/${hash}.jpg`;
+                    }
                 }
 
                 return {
@@ -237,7 +241,8 @@ router.get('/browse', (req, res) => {
                     // 해싱 로직 적용하여 프론트엔드용 썸네일 URL 주입
                     const hash = crypto.createHash('md5').update(video.id.toString()).digest('hex');
                     const folderName = hash.substring(0, 2);
-                    video.thumbnail_url = `/thumbnails/${folderName}/${hash}.jpg`;
+                    const thumbPath = path.join(process.cwd(), 'public', 'thumbnails', folderName, `${hash}.jpg`);
+                    video.thumbnail_url = fs.existsSync(thumbPath) ? `/thumbnails/${folderName}/${hash}.jpg` : undefined;
                     videos.push(video);
                 }
             });

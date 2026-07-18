@@ -22,6 +22,37 @@ let watcher: FSWatcher | null = null;
 // 비디오 파일 확장자 필터
 const VIDEO_EXTENSIONS = ['.mp4', '.mkv', '.avi', '.mov', '.webm'];
 
+class TaskQueue {
+    private queue: (() => Promise<void>)[] = [];
+    private running = 0;
+    private concurrency: number;
+
+    constructor(concurrency: number) {
+        this.concurrency = concurrency;
+    }
+
+    add(task: () => Promise<void>) {
+        this.queue.push(task);
+        this.next();
+    }
+
+    private next() {
+        if (this.running >= this.concurrency || this.queue.length === 0) {
+            return;
+        }
+        const task = this.queue.shift();
+        if (task) {
+            this.running++;
+            task().finally(() => {
+                this.running--;
+                this.next();
+            });
+        }
+    }
+}
+
+const scannerQueue = new TaskQueue(4);
+
 /**
  * ID 기반 썸네일 해시 경로 생성기
  */
@@ -118,7 +149,7 @@ const generateMissingThumbnails = async () => {
             }
 
             if (!fs.existsSync(thumbInfo.absolutePath) && fs.existsSync(video.file_path)) {
-                await generateThumbnail(video.file_path, video.id).catch(() => { });
+                scannerQueue.add(() => generateThumbnail(video.file_path, video.id).catch(() => {}));
             }
         }
     } catch (err) {
@@ -140,6 +171,19 @@ export const startScanner = () => {
     const { mediaDir } = getConfig();
     if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir, { recursive: true });
 
+    // 서버 재시작 시 DB와 실제 파일 시스템 동기화 (Ghost 엔트리 제거)
+    const allVideos = db.prepare('SELECT id, file_path FROM videos').all() as any[];
+    for (const v of allVideos) {
+        if (!fs.existsSync(v.file_path)) {
+            console.log(`🗑️ 사라진 비디오 정리됨: ${path.basename(v.file_path)}`);
+            db.prepare('DELETE FROM videos WHERE id = ?').run(v.id);
+            const thumbInfo = getThumbnailPath(v.id);
+            if (fs.existsSync(thumbInfo.absolutePath)) fs.unlinkSync(thumbInfo.absolutePath);
+            const legacyPath = path.join(process.cwd(), 'public', 'thumbnails', `${v.id}.jpg`);
+            if (fs.existsSync(legacyPath)) fs.unlinkSync(legacyPath);
+        }
+    }
+
     console.log(`🔍 스캐너 시작: ${mediaDir} 폴더 감시 중...`);
 
     // 시작 시 기존 썸네일 검사(마이그레이션 포함)
@@ -155,49 +199,62 @@ export const startScanner = () => {
         },
     });
 
+    const processingFiles = new Set<string>();
+
     watcher.on('add', async (filePath) => {
         const ext = path.extname(filePath).toLowerCase();
 
         if (VIDEO_EXTENSIONS.includes(ext)) {
-            try {
-                // 이미 DB에 존재하는 파일인지 확인 (경로 기준)
-                const existing: any = db.prepare('SELECT id FROM videos WHERE file_path = ?').get(filePath);
-                if (existing) {
-                    console.log(`➡️ 기존에 존재하는 비디오: ${path.basename(filePath)}`);
-                    // 이미 등록된 경우 스킵
-                    // 파일은 있는데 썸네일이 없을 수 있으므로 생성 시도
-                    generateThumbnail(filePath, existing.id).catch(() => { });
-                    return;
+            if (processingFiles.has(filePath)) return;
+            processingFiles.add(filePath);
+
+            scannerQueue.add(async () => {
+                try {
+                    // 이미 DB에 존재하는 파일인지 확인 (경로 기준)
+                    const existing: any = db.prepare('SELECT id FROM videos WHERE file_path = ?').get(filePath);
+                    if (existing) {
+                        console.log(`➡️ 기존에 존재하는 비디오: ${path.basename(filePath)}`);
+                        // 파일은 있는데 썸네일이 없을 수 있으므로 큐에 생성 작업 추가
+                        scannerQueue.add(() => generateThumbnail(filePath, existing.id).catch(() => {}));
+                        return;
+                    }
+
+                    console.log(`🎬 새 비디오 감지됨: ${path.basename(filePath)}`);
+                    const fileName = path.basename(filePath);
+                    const metadata = await extractMetadata(filePath);
+                    console.log(`✅ 메타데이터 추출 완료: ${fileName}`);
+
+                    // 트랜잭션으로 DB 삽입
+                    const insert = db.transaction(() => {
+                        return insertVideoStmt.run(
+                            fileName,
+                            filePath,
+                            metadata.size || 0,
+                            metadata.duration || 0,
+                            metadata.resolution,
+                            metadata.videoCodec,
+                            metadata.audioCodec,
+                            metadata.container
+                        );
+                    });
+
+                    try {
+                        const result = insert();
+                        // 썸네일 생성 작업 큐에 추가
+                        scannerQueue.add(() => generateThumbnail(filePath, result.lastInsertRowid).catch(() => {}));
+                    } catch (insertError: any) {
+                        if (insertError.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+                            console.log(`➡️ 이미 등록된 비디오 (중복 무시됨): ${fileName}`);
+                        } else {
+                            throw insertError;
+                        }
+                    }
+                } catch (error) {
+                    console.error(`❌ 메타데이터 추출/저장 실패 (${filePath}):`, error);
+                } finally {
+                    processingFiles.delete(filePath);
                 }
-
-                console.log(`🎬 새 비디오 감지됨: ${path.basename(filePath)}`);
-
-                const fileName = path.basename(filePath);
-                const metadata = await extractMetadata(filePath);
-                console.log(`✅ 메타데이터 추출 완료: ${fileName}`);
-
-                // 트랜잭션으로 DB 삽입
-                const insert = db.transaction(() => {
-                    return insertVideoStmt.run(
-                        fileName,
-                        filePath,
-                        metadata.size || 0,
-                        metadata.duration || 0,
-                        metadata.resolution,
-                        metadata.videoCodec,
-                        metadata.audioCodec,
-                        metadata.container
-                    );
-                });
-
-                const result = insert();
-
-                // 썸네일 생성 비동기 호출 (블로킹 방지)
-                generateThumbnail(filePath, result.lastInsertRowid).catch(() => { });
-
-            } catch (error) {
-                console.error(`❌ 메타데이터 추출/저장 실패 (${filePath}):`, error);
-            }
+            });
         }
     });
 

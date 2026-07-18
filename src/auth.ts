@@ -2,6 +2,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import rateLimit from 'express-rate-limit';
+import jwt from 'jsonwebtoken';
 import db from './db';
 import {
     generateRegistrationOptions,
@@ -84,6 +85,20 @@ router.post('/register', async (req, res) => {
     } catch (err: any) {
         console.error(err);
         res.status(500).json({ error: '회원가입 중 오류가 발생했습니다.' });
+    }
+});
+
+// ─── API: 미디어 스트리밍용 임시 토큰 발급 (Chromecast, AirPlay 용) ───
+router.get('/stream-token', (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ error: '인증이 필요합니다.' });
+
+    try {
+        const secret = process.env.SESSION_SECRET || 'default_secret_key';
+        const token = jwt.sign({ userId: req.session.userId }, secret, { expiresIn: '12h' });
+        res.json({ token });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: '스트리밍 토큰 발급 중 오류가 발생했습니다.' });
     }
 });
 
