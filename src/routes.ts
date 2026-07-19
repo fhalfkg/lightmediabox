@@ -393,9 +393,8 @@ router.get('/hls/:id/qualities', (req, res) => {
     // MP4/WebM 컨테이너에 H.264/AAC 코덱인 경우 Direct Play (TS 변환 없는 원본 스트리밍) 지원 여부 판별
     // ffprobe는 컨테이너 포맷을 'mov,mp4,m4a,3gp,3g2,mj2' 형식으로 반환하므로 includes를 사용합니다.
     const isDirectPlaySupported = 
-        (video.container_format.includes('mp4') || video.container_format.includes('webm') || video.container_format.includes('mov')) &&
-        video.video_codec === 'h264' &&
-        video.audio_codec === 'aac';
+        ((video.container_format.includes('mp4') || video.container_format.includes('mov')) && video.video_codec === 'h264' && video.audio_codec === 'aac') ||
+        (video.container_format.includes('webm') && (video.video_codec === 'vp8' || video.video_codec === 'vp9' || video.video_codec === 'av1'));
 
     res.json({ qualities, isDirectPlaySupported });
 });
