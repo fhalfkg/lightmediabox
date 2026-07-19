@@ -396,10 +396,11 @@ img.thumb-bg {
     z-index: 5;
     color: rgba(255, 255, 255, 0.95);
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.8));
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 4px;
+    display: grid;
+    grid-template-columns: 14px auto;
+    row-gap: 4px;
+    column-gap: 6px;
+    align-items: center;
     font-size: 13px;
     font-weight: 500;
     background: rgba(0, 0, 0, 0.4);
@@ -408,17 +409,16 @@ img.thumb-bg {
     backdrop-filter: blur(4px);
 }
 
-.count-item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.count-item svg {
+.folder-counts svg {
     width: 14px;
     height: 14px;
     fill: currentColor;
     opacity: 0.8;
+}
+
+.folder-counts span {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
 }
 
 .card-info {

@@ -213,6 +213,20 @@ function sortVideos(videos) {
     });
 }
 
+// ─── 화면 상태 복원 이력 ───
+const viewHistory = {};
+
+function getHistoryKey() {
+    return currentViewMode === 'folder' ? `folder:${currentBrowsePath}` : 'videos';
+}
+
+function saveCurrentHistory() {
+    viewHistory[getHistoryKey()] = {
+        scroll: window.scrollY,
+        limit: currentRenderLimit
+    };
+}
+
 // ─── 데이터 로드 ───
 async function loadLibrary() {
     libraryGrid.innerHTML = '<div class="empty-grid">불러오는 중...</div>';
@@ -256,6 +270,7 @@ async function loadLibrary() {
 }
 
 async function browsePath(targetPath) {
+    saveCurrentHistory();
     currentBrowsePath = targetPath;
     currentViewMode = 'folder';
     updateTabsUI();
@@ -322,10 +337,10 @@ function renderLibrary() {
             if (folder.videoCount > 0 || folder.imageCount > 0) {
                 countsHtml = '<div class="folder-counts">';
                 if (folder.videoCount > 0) {
-                    countsHtml += `<div class="count-item"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>${folder.videoCount}</div>`;
+                    countsHtml += `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg><span>${folder.videoCount}</span>`;
                 }
                 if (folder.imageCount > 0) {
-                    countsHtml += `<div class="count-item"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>${folder.imageCount}</div>`;
+                    countsHtml += `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg><span>${folder.imageCount}</span>`;
                 }
                 countsHtml += '</div>';
             }
@@ -345,9 +360,20 @@ function renderLibrary() {
     // 미디어 카드 (정렬 적용)
     cachedSortedVideos = sortVideos(videos);
     currentImages = cachedSortedVideos.filter(v => v.type === 'image');
-    currentRenderLimit = RENDER_CHUNK_SIZE;
+    const historyKey = getHistoryKey();
+    const history = viewHistory[historyKey];
+
+    currentRenderLimit = history ? history.limit : RENDER_CHUNK_SIZE;
 
     renderVideoChunk();
+
+    if (history && history.scroll) {
+        setTimeout(() => {
+            window.scrollTo({ top: history.scroll, behavior: 'instant' });
+        }, 0);
+    } else {
+        window.scrollTo({ top: 0, behavior: 'instant' });
+    }
 }
 
 function renderVideoChunk() {
@@ -428,15 +454,21 @@ function updateTabsUI() {
 
 // ─── 상단 UI 이벤트 리스너 ───
 tabFolder.onclick = () => {
-    currentViewMode = 'folder';
-    updateTabsUI();
-    loadLibrary();
+    if (currentViewMode !== 'folder') {
+        saveCurrentHistory();
+        currentViewMode = 'folder';
+        updateTabsUI();
+        loadLibrary();
+    }
 };
 
 tabVideo.onclick = () => {
-    currentViewMode = 'video';
-    updateTabsUI();
-    loadLibrary();
+    if (currentViewMode !== 'video') {
+        saveCurrentHistory();
+        currentViewMode = 'video';
+        updateTabsUI();
+        loadLibrary();
+    }
 };
 
 sortSelect.onchange = (e) => {
