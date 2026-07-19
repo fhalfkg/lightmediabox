@@ -440,6 +440,12 @@ router.get('/hls/:id/:quality/:file', (req, res) => {
             
             // 입력 옵션: 고속 탐색 (Input Seek) 및 멀티코어 디코딩 활성화
             const inputOptions = ['-threads', '0'];
+            
+            // AV1 비디오인 경우 libdav1d 디코더 강제 사용 (손상된 헤더 무시 및 호환성 확보)
+            if (video.video_codec === 'av1' || video.video_codec === 'av01') {
+                inputOptions.push('-c:v', 'libdav1d');
+            }
+            
             if (startTime > 0) {
                 inputOptions.push('-ss', String(startTime));
             }

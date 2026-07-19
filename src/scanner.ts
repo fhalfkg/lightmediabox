@@ -2,15 +2,14 @@ import { watch, FSWatcher } from 'chokidar';
 import path from 'path';
 import fs from 'fs';
 import ffmpeg from 'fluent-ffmpeg';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
-import ffprobeInstaller from '@ffprobe-installer/ffprobe';
+import { getFfmpegPath, getFfprobePath } from './setup-ffmpeg';
 import db from './db';
 import crypto from 'crypto';
 import { getConfig } from './config';
 
 // ffmpeg & ffprobe 경로 설정
-ffmpeg.setFfmpegPath(ffmpegInstaller.path);
-ffmpeg.setFfprobePath(ffprobeInstaller.path);
+ffmpeg.setFfmpegPath(getFfmpegPath());
+ffmpeg.setFfprobePath(getFfprobePath());
 
 const THUMBNAIL_DIR = path.resolve(process.cwd(), 'public/thumbnails');
 
@@ -120,7 +119,7 @@ const extractMetadata = (filePath: string): Promise<any> => {
 /**
  * FFmpeg를 사용하여 영상의 10% 지점에서 썸네일 생성
  */
-const generateThumbnail = (filePath: string, id: number | bigint): Promise<void> => {
+const generateThumbnail = (filePath: string, id: number | bigint, videoCodec?: string): Promise<void> => {
     return new Promise((resolve, reject) => {
         const thumbInfo = getThumbnailPath(id.toString());
 
@@ -148,7 +147,14 @@ const generateThumbnail = (filePath: string, id: number | bigint): Promise<void>
                 })
                 .run();
         } else {
-            ffmpeg(filePath)
+            let command = ffmpeg(filePath);
+            
+            // AV1 비디오인 경우 libdav1d 디코더 강제 사용 (손상된 헤더 무시 및 호환성 확보)
+            if (videoCodec === 'av1' || videoCodec === 'av01') {
+                command = command.inputOptions(['-c:v libdav1d']);
+            }
+
+            command
                 .outputOptions(['-pix_fmt yuvj420p'])
                 .screenshots({
                     timestamps: ['10%'],
@@ -173,7 +179,7 @@ const generateThumbnail = (filePath: string, id: number | bigint): Promise<void>
  */
 const generateMissingThumbnails = async () => {
     try {
-        const videos = db.prepare('SELECT id, file_path FROM videos').all() as any[];
+        const videos = db.prepare('SELECT id, file_path, video_codec FROM videos').all() as any[];
         for (const video of videos) {
             const thumbInfo = getThumbnailPath(video.id);
 
@@ -188,7 +194,7 @@ const generateMissingThumbnails = async () => {
             }
 
             if (!fs.existsSync(thumbInfo.absolutePath) && fs.existsSync(video.file_path)) {
-                scannerQueue.add(() => generateThumbnail(video.file_path, video.id).catch(() => { }));
+                scannerQueue.add(() => generateThumbnail(video.file_path, video.id, video.video_codec).catch(() => { }));
             }
         }
     } catch (err) {
@@ -257,7 +263,7 @@ export const startScanner = () => {
             if (processingFiles.has(filePath)) return;
 
             // 큐에 넣기 전에 동기적으로 DB 존재 여부 확인 (ready 이벤트를 위해 정확한 카운트 측정)
-            const existing: any = db.prepare('SELECT id FROM videos WHERE file_path = ?').get(filePath);
+            const existing: any = db.prepare('SELECT id, video_codec FROM videos WHERE file_path = ?').get(filePath);
             if (existing) {
                 if (!isWatcherReady) {
                     initialExistingCount++;
@@ -265,7 +271,7 @@ export const startScanner = () => {
                     console.log(`➡️ 기존에 존재하는 미디어: ${path.basename(filePath)}`);
                 }
                 // 썸네일 생성을 위한 큐 추가 (메인 큐 병목 방지를 위해 분리)
-                scannerQueue.add(() => generateThumbnail(filePath, existing.id).catch(() => { }));
+                scannerQueue.add(() => generateThumbnail(filePath, existing.id, existing.video_codec).catch(() => { }));
                 return;
             }
 
@@ -302,7 +308,7 @@ export const startScanner = () => {
                     try {
                         const result = insert();
                         // 썸네일 생성 작업 큐에 추가
-                        scannerQueue.add(() => generateThumbnail(filePath, result.lastInsertRowid).catch(() => { }));
+                        scannerQueue.add(() => generateThumbnail(filePath, result.lastInsertRowid, metadata.videoCodec).catch(() => { }));
                     } catch (insertError: any) {
                         if (insertError.code === 'SQLITE_CONSTRAINT_UNIQUE') {
                             console.log(`➡️ 이미 등록된 미디어 (중복 무시됨): ${fileName}`);

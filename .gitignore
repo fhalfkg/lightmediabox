@@ -1,9 +1,10 @@
 node_modules/
 dist/
+ffmpeg/
 hls_temp/
 public/thumbnails/
 media/
 *.db
 *.sqlite
 config.json
-.env
+.env*

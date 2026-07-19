@@ -9,6 +9,8 @@ import authRoutes from './auth';
 import db from './db';
 import jwt from 'jsonwebtoken';
 
+import { setupFfmpeg } from './setup-ffmpeg';
+
 const SqliteStore = require('better-sqlite3-session-store')(session);
 
 const app = express();
@@ -40,7 +42,7 @@ app.use('/api/auth', authRoutes);
 
 // API 보안 미들웨어 (인증되지 않은 요청 차단)
 app.use('/api', (req, res, next) => {
-    if (req.session.userId) {
+    if (process.env.NODE_ENV === 'development' || req.session.userId) {
         return next();
     }
 
@@ -58,9 +60,6 @@ app.use('/api', (req, res, next) => {
     return res.status(401).json({ error: '인증이 필요합니다.' });
 });
 
-// 스캐너 실행
-startScanner();
-
 app.use(express.static(path.join(process.cwd(), 'public')));
 
 // 일반 API 라우터 등록
@@ -70,6 +69,15 @@ app.get('/', (req, res) => {
     res.send('LightMediaBox HLS Server is running! 영상을 보려면 /api/videos 를 확인하세요.');
 });
 
-app.listen(PORT, () => {
-    console.log(`🚀 미디어 서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
+// ffmpeg 설정 후 서버 시작
+setupFfmpeg().then(() => {
+    // 스캐너 실행
+    startScanner();
+
+    app.listen(PORT, () => {
+        console.log(`🚀 미디어 서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
+    });
+}).catch(err => {
+    console.error('❌ ffmpeg 초기화 실패:', err);
+    process.exit(1);
 });

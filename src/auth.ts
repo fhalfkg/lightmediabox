@@ -40,6 +40,9 @@ declare module 'express-session' {
 
 // ─── API: 현재 세션 상태 확인 ───
 router.get('/session', (req, res) => {
+    if (process.env.NODE_ENV === 'development') {
+        return res.json({ loggedIn: true, username: 'DevUser' });
+    }
     if (req.session.userId) {
         return res.json({ loggedIn: true, username: req.session.username });
     }
@@ -401,10 +404,6 @@ router.get('/passkey/add-options', async (req, res) => {
             userID: new Uint8Array(Buffer.from(req.session.userId)),
             userName: user.username,
             attestationType: 'none',
-            excludeCredentials: existingPasskeys.map(pk => ({
-                id: pk.credential_id, // v10 requires Base64URL string
-                type: 'public-key'
-            })),
             authenticatorSelection: {
                 residentKey: 'required',
                 userVerification: 'preferred',
