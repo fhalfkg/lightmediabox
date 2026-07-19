@@ -178,7 +178,7 @@ router.get('/passkey/register-options', async (req, res) => {
     const options = await generateRegistrationOptions({
         rpName,
         rpID: req.hostname,
-        userID: new Uint8Array(Buffer.from(user.id)),
+        userID: new Uint8Array(crypto.createHash('sha256').update(user.id).digest()),
         userName: user.username,
         attestationType: 'none',
         excludeCredentials: passkeys.map(pk => ({
@@ -401,7 +401,7 @@ router.get('/passkey/add-options', async (req, res) => {
         const options = await generateRegistrationOptions({
             rpName,
             rpID: req.hostname,
-            userID: new Uint8Array(Buffer.from(req.session.userId)),
+            userID: new Uint8Array(crypto.createHash('sha256').update(req.session.userId).digest()),
             userName: user.username,
             attestationType: 'none',
             authenticatorSelection: {
