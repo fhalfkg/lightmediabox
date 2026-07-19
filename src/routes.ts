@@ -565,6 +565,10 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
             if (video.video_codec === 'av1' || video.video_codec === 'av01') {
                 inputOptions.push('-c:v', 'libdav1d');
             }
+
+            if (vCodec === 'h264_vaapi') {
+                inputOptions.push('-hwaccel', 'vaapi', '-hwaccel_device', '/dev/dri/renderD128', '-hwaccel_output_format', 'vaapi');
+            }
             
             if (startTime > 0) {
                 inputOptions.push('-ss', String(startTime));
@@ -591,8 +595,19 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
                 outputOptions.push('-output_ts_offset', String(startTime));
             }
 
-            if (needsScale) {
-                outputOptions.push('-vf', `scale=-2:${quality.replace('p', '')}`);
+            if (vCodec === 'h264_vaapi') {
+                if (needsScale) {
+                    outputOptions.push('-vf', `format=nv12,hwupload,scale_vaapi=w=-2:h=${quality.replace('p', '')}`);
+                } else {
+                    outputOptions.push('-vf', 'format=nv12,hwupload');
+                }
+            } else {
+                if (needsScale) {
+                    outputOptions.push('-vf', `scale=-2:${quality.replace('p', '')}`);
+                }
+                if (vCodec !== 'copy') {
+                    outputOptions.push('-pix_fmt', 'yuv420p');
+                }
             }
 
             if (vCodec === 'libx264') {
