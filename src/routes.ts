@@ -590,7 +590,7 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
                 '-f', 'hls'
             ];
 
-            if (vCodec !== 'copy') {
+            if (vCodec !== 'copy' && vCodec !== 'h264_vaapi') {
                 outputOptions.push('-pix_fmt', 'yuv420p');
             }
 
@@ -601,16 +601,14 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
 
             if (vCodec === 'h264_vaapi') {
                 if (needsScale) {
-                    outputOptions.push('-vf', `format=nv12,hwupload,scale_vaapi=w=-2:h=${quality.replace('p', '')}`);
+                    outputOptions.push('-vf', `scale_vaapi=w=-2:h=${quality.replace('p', '')}:format=nv12`);
                 } else {
-                    outputOptions.push('-vf', 'format=nv12,hwupload');
+                    // 원본 화질일 경우 스케일링 없이 픽셀 포맷(10bit -> 8bit 등)만 하드웨어에서 맞춤
+                    outputOptions.push('-vf', 'scale_vaapi=format=nv12');
                 }
             } else {
                 if (needsScale) {
                     outputOptions.push('-vf', `scale=-2:${quality.replace('p', '')}`);
-                }
-                if (vCodec !== 'copy') {
-                    outputOptions.push('-pix_fmt', 'yuv420p');
                 }
             }
 
