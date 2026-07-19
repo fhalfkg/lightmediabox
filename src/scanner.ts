@@ -144,7 +144,7 @@ const generateThumbnail = (filePath: string, id: number | bigint, videoCodec?: s
 
         if (isImage) {
             ffmpeg(filePath)
-                .outputOptions(['-vf', 'scale=480:-1'])
+                .outputOptions(['-vf', 'scale=480:-1', '-vframes', '1'])
                 .output(tmpPath)
                 .on('end', () => {
                     if (fs.existsSync(tmpPath)) {
