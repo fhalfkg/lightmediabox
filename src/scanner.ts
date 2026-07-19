@@ -143,7 +143,7 @@ const generateThumbnail = (filePath: string, id: number | bigint): Promise<void>
                     resolve();
                 })
                 .on('error', (err) => {
-                    console.error(`❌ 썸네일 생성 실패 (이미지, ${path.basename(filePath)}):`, err.message);
+                    console.error(`❌ 썸네일 생성 실패 (이미지, ${filePath}):`, err.message);
                     reject(err);
                 })
                 .run();
@@ -161,7 +161,7 @@ const generateThumbnail = (filePath: string, id: number | bigint): Promise<void>
                     resolve();
                 })
                 .on('error', (err) => {
-                    console.error(`❌ 썸네일 생성 실패 (비디오, ${path.basename(filePath)}):`, err.message);
+                    console.error(`❌ 썸네일 생성 실패 (비디오, ${filePath}):`, err.message);
                     reject(err);
                 });
         }
