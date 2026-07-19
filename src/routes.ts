@@ -119,6 +119,26 @@ router.get('/settings/transcoder', (req, res) => {
                 const cpu = cp.execSync('powershell "Get-CimInstance Win32_Processor | Select-Object -ExpandProperty Name"', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
                 if (cpu) gpuInfo = cpu;
             }
+        } else if (os.platform() === 'linux') {
+            try {
+                const gpu = cp.execSync('lspci | grep -iE "vga|3d"', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+                if (gpu) {
+                    const parts = gpu.split('\n')[0].split(':');
+                    gpuInfo = parts[parts.length - 1].trim();
+                }
+            } catch (e) {}
+
+            if (gpuInfo === '알 수 없는 하드웨어') {
+                try {
+                    const cpu = cp.execSync('grep -m 1 "model name" /proc/cpuinfo', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+                    if (cpu) gpuInfo = cpu.split(':')[1].trim();
+                } catch (e) {}
+            }
+        } else if (os.platform() === 'darwin') {
+            try {
+                const cpu = cp.execSync('sysctl -n machdep.cpu.brand_string', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+                if (cpu) gpuInfo = cpu;
+            } catch(e) {}
         }
     } catch (e) {}
 
