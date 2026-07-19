@@ -143,7 +143,7 @@ const generateThumbnail = (filePath: string, id: number | bigint): Promise<void>
                     resolve();
                 })
                 .on('error', (err) => {
-                    console.error(`❌ 썸네일 생성 실패 (이미지, ${id}):`, err.message);
+                    console.error(`❌ 썸네일 생성 실패 (이미지, ${path.basename(filePath)}):`, err.message);
                     reject(err);
                 })
                 .run();
@@ -161,7 +161,7 @@ const generateThumbnail = (filePath: string, id: number | bigint): Promise<void>
                     resolve();
                 })
                 .on('error', (err) => {
-                    console.error(`❌ 썸네일 생성 실패 (비디오, ${id}):`, err.message);
+                    console.error(`❌ 썸네일 생성 실패 (비디오, ${path.basename(filePath)}):`, err.message);
                     reject(err);
                 });
         }
@@ -239,6 +239,16 @@ export const startScanner = () => {
     });
 
     const processingFiles = new Set<string>();
+    let isWatcherReady = false;
+    let initialExistingCount = 0;
+
+    watcher.on('ready', () => {
+        isWatcherReady = true;
+        if (initialExistingCount > 0) {
+            console.log(`➡️ 기존에 존재하는 미디어 총 ${initialExistingCount}개 확인 완료`);
+        }
+        console.log('✅ 초기 스캔 완료. 이후 변경 사항을 감시합니다.');
+    });
 
     watcher.on('add', async (filePath) => {
         const ext = path.extname(filePath).toLowerCase();
@@ -252,7 +262,11 @@ export const startScanner = () => {
                     // 이미 DB에 존재하는 파일인지 확인 (경로 기준)
                     const existing: any = db.prepare('SELECT id FROM videos WHERE file_path = ?').get(filePath);
                     if (existing) {
-                        console.log(`➡️ 기존에 존재하는 미디어: ${path.basename(filePath)}`);
+                        if (!isWatcherReady) {
+                            initialExistingCount++;
+                        } else {
+                            console.log(`➡️ 기존에 존재하는 미디어: ${path.basename(filePath)}`);
+                        }
                         // 파일은 있는데 썸네일이 없을 수 있으므로 큐에 생성 작업 추가
                         scannerQueue.add(() => generateThumbnail(filePath, existing.id).catch(() => { }));
                         return;
