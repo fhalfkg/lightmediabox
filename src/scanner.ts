@@ -255,22 +255,27 @@ export const startScanner = () => {
 
         if (MEDIA_EXTENSIONS.includes(ext)) {
             if (processingFiles.has(filePath)) return;
+
+            // 큐에 넣기 전에 동기적으로 DB 존재 여부 확인 (ready 이벤트를 위해 정확한 카운트 측정)
+            const existing: any = db.prepare('SELECT id FROM videos WHERE file_path = ?').get(filePath);
+            if (existing) {
+                if (!isWatcherReady) {
+                    initialExistingCount++;
+                } else {
+                    console.log(`➡️ 기존에 존재하는 미디어: ${path.basename(filePath)}`);
+                }
+                // 썸네일 생성을 위한 큐 추가 (메인 큐 병목 방지를 위해 분리)
+                scannerQueue.add(() => generateThumbnail(filePath, existing.id).catch(() => { }));
+                return;
+            }
+
             processingFiles.add(filePath);
 
             scannerQueue.add(async () => {
                 try {
-                    // 이미 DB에 존재하는 파일인지 확인 (경로 기준)
-                    const existing: any = db.prepare('SELECT id FROM videos WHERE file_path = ?').get(filePath);
-                    if (existing) {
-                        if (!isWatcherReady) {
-                            initialExistingCount++;
-                        } else {
-                            console.log(`➡️ 기존에 존재하는 미디어: ${path.basename(filePath)}`);
-                        }
-                        // 파일은 있는데 썸네일이 없을 수 있으므로 큐에 생성 작업 추가
-                        scannerQueue.add(() => generateThumbnail(filePath, existing.id).catch(() => { }));
-                        return;
-                    }
+                    // 혹시 모를 중복 방지 한 번 더 확인
+                    const doubleCheck: any = db.prepare('SELECT id FROM videos WHERE file_path = ?').get(filePath);
+                    if (doubleCheck) return;
 
                     console.log(`🎬 새 미디어 감지됨: ${path.basename(filePath)}`);
                     const fileName = path.basename(filePath);
