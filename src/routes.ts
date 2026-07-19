@@ -635,7 +635,7 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
                 .output(path.join(outDir, 'dummy.m3u8'))
                 .on('start', (cmd) => console.log(`✅ [${quality}] 실행 명령어:`, cmd))
                 .on('stderr', (stderr) => {
-                    if (stderr.toLowerCase().includes('error')) {
+                    if (stderr.toLowerCase().includes('error') && !stderr.includes('configuration:')) {
                         console.error(`❌ [${quality}] FFmpeg 에러:`, stderr);
                     }
                 })
