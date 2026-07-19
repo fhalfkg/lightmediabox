@@ -408,6 +408,19 @@ img.thumb-bg {
     backdrop-filter: blur(4px);
 }
 
+.count-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.count-item svg {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+    opacity: 0.8;
+}
+
 .card-info {
     position: relative;
     z-index: 2;
