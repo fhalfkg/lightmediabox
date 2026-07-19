@@ -180,6 +180,7 @@ router.get('/passkey/register-options', async (req, res) => {
         rpID: req.hostname,
         userID: new Uint8Array(crypto.createHash('sha256').update(user.id).digest()),
         userName: user.username,
+        userDisplayName: user.username,
         attestationType: 'none',
         excludeCredentials: passkeys.map(pk => ({
             id: pk.credential_id,
@@ -403,6 +404,7 @@ router.get('/passkey/add-options', async (req, res) => {
             rpID: req.hostname,
             userID: new Uint8Array(crypto.createHash('sha256').update(req.session.userId).digest()),
             userName: user.username,
+            userDisplayName: user.username,
             attestationType: 'none',
             authenticatorSelection: {
                 residentKey: 'required',
