@@ -1589,7 +1589,7 @@ function initializeCastApi() {
         autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
     });
 
-    btnCastWrapper.style.display = 'inline-block';
+    btnCastWrapper.style.display = 'flex';
 
     const context = cast.framework.CastContext.getInstance();
     context.addEventListener(cast.framework.CastContextEventType.SESSION_STATE_CHANGED, function (event) {

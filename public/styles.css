@@ -551,6 +551,41 @@ img.thumb-bg {
     border-color: rgba(167, 139, 250, 0.5);
 }
 
+#top-right-controls {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    z-index: 110;
+    display: flex;
+    gap: 12px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+#player-wrapper.controls-visible #top-right-controls {
+    opacity: 1;
+}
+
+#top-right-controls .ctrl-btn {
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 8px;
+    width: auto;
+    height: auto;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#top-right-controls .ctrl-btn:hover {
+    background: rgba(139, 92, 246, 0.8);
+    border-color: rgba(167, 139, 250, 0.5);
+}
+
 /* 플레이어 기존 CSS 재사용 */
 #player-wrapper {
     position: relative;
@@ -1441,4 +1476,8 @@ google-cast-launcher { --connected-color: #fff; --disconnected-color: #fff; widt
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
+}
+
+#btn-fullscreen {
+    margin-right: -6px; /* 우측 여백 밸런스 조정 */
 }
