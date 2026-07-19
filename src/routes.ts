@@ -85,6 +85,14 @@ router.post('/config', async (req, res) => {
 
     try {
         const resolvedPath = path.resolve(mediaDir);
+        
+        const currentConfig = getConfig();
+        if (currentConfig && currentConfig.mediaDir) {
+            if (path.resolve(currentConfig.mediaDir) === resolvedPath) {
+                return res.json({ success: true, mediaDir: resolvedPath, unchanged: true });
+            }
+        }
+
         if (!fs.existsSync(resolvedPath)) {
             fs.mkdirSync(resolvedPath, { recursive: true });
         }
