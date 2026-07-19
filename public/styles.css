@@ -1109,6 +1109,29 @@ video {
     color: #fff;
 }
 
+.btn-danger {
+    background: #dc2626;
+    color: #fff;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.btn-danger:hover {
+    background: #b91c1c;
+}
+
+.btn-primary:disabled,
+.btn-danger:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 /* ─── 반응형 모바일 ─── */
 @media (max-width: 768px) {
     .header-top {

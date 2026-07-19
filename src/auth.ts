@@ -466,4 +466,27 @@ router.post('/passkey/add-verify', async (req, res) => {
     }
 });
 
+// ─── API: 계정 초기화 (Danger Zone) ───
+router.post('/reset', (req, res) => {
+    if (!req.session.userId) {
+        return res.status(401).json({ error: '인증이 필요합니다.' });
+    }
+
+    try {
+        db.prepare('DELETE FROM passkeys').run();
+        db.prepare('DELETE FROM users').run();
+        
+        req.session.destroy((err) => {
+            if (err) {
+                console.error('세션 파기 오류:', err);
+                return res.status(500).json({ error: '초기화는 성공했으나 세션 파기에 실패했습니다.' });
+            }
+            res.json({ success: true, message: '모든 관리자 정보가 삭제되었습니다.' });
+        });
+    } catch (error: any) {
+        console.error('계정 초기화 오류:', error);
+        res.status(500).json({ error: '계정 초기화 중 서버 오류가 발생했습니다.' });
+    }
+});
+
 export default router;

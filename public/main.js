@@ -32,8 +32,19 @@ function showCustomDialog(options) {
             input.style.display = 'block';
             input.value = options.defaultValue || '';
             input.focus();
+            
+            if (options.requireMatch) {
+                btnConfirm.disabled = true;
+                input.oninput = () => {
+                    btnConfirm.disabled = input.value !== options.requireMatch;
+                };
+            } else {
+                btnConfirm.disabled = false;
+                input.oninput = null;
+            }
         } else {
             input.style.display = 'none';
+            btnConfirm.disabled = false;
         }
 
         dialog.classList.add('visible');
@@ -42,6 +53,8 @@ function showCustomDialog(options) {
             dialog.classList.remove('visible');
             btnCancel.onclick = null;
             btnConfirm.onclick = null;
+            input.oninput = null;
+            btnConfirm.disabled = false;
         };
 
         btnCancel.onclick = () => {
@@ -940,7 +953,36 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// ─── 유틸리티 ───
+const btnResetAccount = document.getElementById('btn-reset-account');
+if (btnResetAccount) {
+    btnResetAccount.onclick = async () => {
+        const confirmText = '계정 삭제 및 초기화';
+        const result = await showCustomDialog({
+            type: 'prompt',
+            title: '위험: 계정 삭제 및 초기화',
+            message: `이 작업은 되돌릴 수 없으며, 모든 관리자 정보 및 패스키가 삭제됩니다.\n계속하려면 아래 입력창에 "${confirmText}" 를 정확히 입력하세요.`,
+            requireMatch: confirmText
+        });
+
+        if (result === confirmText) {
+            try {
+                const res = await fetch('/api/auth/reset', { method: 'POST' });
+                if (res.ok) {
+                    showToast('초기화가 완료되었습니다. 설정 화면으로 이동합니다.', 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    const err = await res.json();
+                    showToast(err.error || '초기화 실패', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('초기화 중 오류가 발생했습니다.', 'error');
+            }
+        }
+    };
+}
+
+// ─── 렌더링 유틸리티 ───
 function formatTime(sec) {
     if (isNaN(sec) || sec < 0) return '0:00';
     const h = Math.floor(sec / 3600);
