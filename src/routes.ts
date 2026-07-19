@@ -221,6 +221,20 @@ router.get('/browse', (req, res) => {
                     if (r.type === 'image') imageCount = r.count;
                 });
                 
+                const agg = db.prepare('SELECT SUM(file_size) as total_size, MAX(duration) as max_duration FROM videos WHERE file_path LIKE ?').get(pattern) as { total_size: number | null, max_duration: number | null };
+                
+                const resRows = db.prepare("SELECT resolution FROM videos WHERE file_path LIKE ? AND type='video' AND resolution IS NOT NULL").all(pattern) as { resolution: string }[];
+                let maxResValue = 0;
+                for (const r of resRows) {
+                    if (r.resolution && r.resolution !== 'unknown') {
+                        const parts = r.resolution.split('x');
+                        if (parts.length === 2) {
+                            const val = parseInt(parts[0]) * parseInt(parts[1]);
+                            if (val > maxResValue) maxResValue = val;
+                        }
+                    }
+                }
+                
                 let thumbnail_url = undefined;
                 if (randomVideo) {
                     const hash = crypto.createHash('md5').update(randomVideo.id.toString()).digest('hex');
@@ -233,10 +247,12 @@ router.get('/browse', (req, res) => {
                     path: folderPath,
                     thumbnail_url,
                     videoCount,
-                    imageCount
+                    imageCount,
+                    total_size: agg.total_size || 0,
+                    max_duration: agg.max_duration || 0,
+                    max_resolution_value: maxResValue
                 };
-            })
-            .sort((a, b) => a.name.localeCompare(b.name));
+            });
 
         // 현재 폴더 내 미디어 파일 (DB에서 조회)
         const videos: any[] = [];

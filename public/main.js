@@ -167,12 +167,20 @@ function showLibrary() {
     if (imageViewer) imageViewer.classList.add('hidden');
     libraryView.classList.remove('hidden');
 
+    const history = viewHistory[getHistoryKey()];
+    if (history && history.scroll) {
+        setTimeout(() => {
+            window.scrollTo({ top: history.scroll, behavior: 'instant' });
+        }, 0);
+    }
+
     if (document.fullscreenElement) {
         document.exitFullscreen().catch(() => { });
     }
 }
 
 function showPlayer() {
+    saveCurrentHistory();
     isPlayerMode = true;
     document.body.classList.add('player-mode');
     libraryView.classList.add('hidden');
@@ -190,21 +198,22 @@ function getResolutionValue(resStr) {
     return 0;
 }
 
-function sortVideos(videos) {
-    return videos.slice().sort((a, b) => {
+function sortItems(items, isFolder = false) {
+    return [...items].sort((a, b) => {
         let valA, valB;
+
         if (currentSortBy === 'name') {
-            valA = a.file_name.toLowerCase();
-            valB = b.file_name.toLowerCase();
+            valA = isFolder ? a.name.toLowerCase() : a.file_name.toLowerCase();
+            valB = isFolder ? b.name.toLowerCase() : b.file_name.toLowerCase();
         } else if (currentSortBy === 'duration') {
-            valA = a.type === 'image' ? -1 : (a.duration || 0);
-            valB = b.type === 'image' ? -1 : (b.duration || 0);
+            valA = isFolder ? (a.max_duration || 0) : (a.type === 'image' ? -1 : (a.duration || 0));
+            valB = isFolder ? (b.max_duration || 0) : (b.type === 'image' ? -1 : (b.duration || 0));
         } else if (currentSortBy === 'size') {
-            valA = a.file_size || 0;
-            valB = b.file_size || 0;
+            valA = isFolder ? (a.total_size || 0) : (a.file_size || 0);
+            valB = isFolder ? (b.total_size || 0) : (b.file_size || 0);
         } else if (currentSortBy === 'resolution') {
-            valA = getResolutionValue(a.resolution);
-            valB = getResolutionValue(b.resolution);
+            valA = isFolder ? (a.max_resolution_value || 0) : getResolutionValue(a.resolution);
+            valB = isFolder ? (b.max_resolution_value || 0) : getResolutionValue(b.resolution);
         }
 
         if (valA < valB) return currentSortOrder === 'asc' ? -1 : 1;
@@ -314,7 +323,8 @@ function renderLibrary() {
 
     if (currentViewMode === 'folder') {
         // 폴더 카드
-        folders.forEach(folder => {
+        const sortedFolders = sortItems(folders, true);
+        sortedFolders.forEach(folder => {
             const card = document.createElement('div');
             card.className = 'media-card folder-card';
 
@@ -358,7 +368,7 @@ function renderLibrary() {
     }
 
     // 미디어 카드 (정렬 적용)
-    cachedSortedVideos = sortVideos(videos);
+    cachedSortedVideos = sortItems(videos, false);
     currentImages = cachedSortedVideos.filter(v => v.type === 'image');
     const historyKey = getHistoryKey();
     const history = viewHistory[historyKey];
@@ -499,6 +509,7 @@ btnBackFolder.onclick = () => {
 
 // ─── 이미지 뷰어 로직 ───
 function showImageViewer(id) {
+    saveCurrentHistory();
     isImageViewerMode = true;
     document.body.classList.add('player-mode');
     libraryView.classList.add('hidden');
