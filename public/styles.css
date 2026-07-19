@@ -182,12 +182,14 @@ body.player-mode {
     align-items: center;
     gap: 12px;
     flex: 1;
+    min-width: 0;
 }
 
 .sort-controls {
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-shrink: 0;
 }
 
 #sort-select {
@@ -252,6 +254,7 @@ body.player-mode {
     font-size: 13px;
     font-weight: 500;
     transition: all 0.2s ease;
+    flex-shrink: 0;
 }
 
 #btn-back:hover {
@@ -271,6 +274,10 @@ body.player-mode {
     color: #a1a1aa;
     font-weight: 500;
     user-select: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
 }
 
 #library-grid {
@@ -1380,11 +1387,22 @@ google-cast-launcher { --connected-color: #fff; --disconnected-color: #fff; widt
     font-size: 14px;
     display: flex;
     gap: 12px;
+    align-items: center;
+    max-width: 90%;
     z-index: 105;
     pointer-events: none;
 }
 
 #image-index-text {
+    flex-shrink: 0;
+    white-space: nowrap;
     color: #a1a1aa;
     font-variant-numeric: tabular-nums;
+}
+
+#image-title-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
 }
