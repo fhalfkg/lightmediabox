@@ -117,13 +117,17 @@
                         <small style="margin-top: 8px; display: block;">보안을 위해 최소 1개의 패스키는 유지해야 합니다.</small>
                     </div>
 
-                    <div class="form-group" style="margin-top: 24px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <div class="form-group"
+                        style="margin-top: 24px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.1);">
                         <label style="margin-bottom: 12px; display: block;">비밀번호 변경</label>
                         <form id="form-change-password" target="dummyframe" action="about:blank">
                             <input type="text" id="change-pwd-username" autocomplete="username" style="display:none">
-                            <input type="password" id="current-password" placeholder="현재 비밀번호" required class="auth-input" autocomplete="current-password">
-                            <input type="password" id="new-password" placeholder="새 비밀번호" required class="auth-input" autocomplete="new-password">
-                            <button type="submit" class="btn-primary" style="width: 100%; margin-top: 8px;">비밀번호 변경</button>
+                            <input type="password" id="current-password" placeholder="현재 비밀번호" required
+                                class="auth-input" autocomplete="current-password">
+                            <input type="password" id="new-password" placeholder="새 비밀번호" required class="auth-input"
+                                autocomplete="new-password">
+                            <button type="submit" class="btn-primary" style="width: 100%; margin-top: 8px;">비밀번호
+                                변경</button>
                         </form>
                     </div>
                 </div>
@@ -277,19 +281,22 @@
                     <!-- AirPlay -->
                     <button class="ctrl-btn" id="btn-airplay" title="AirPlay" style="display:none">
                         <svg viewBox="0 0 24 24">
-                            <path d="M6 22h12l-6-6zM21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4v-2H3V5h18v14h-4v2h4c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
+                            <path
+                                d="M6 22h12l-6-6zM21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4v-2H3V5h18v14h-4v2h4c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z" />
                         </svg>
                     </button>
 
                     <!-- Chromecast -->
                     <div class="ctrl-btn" id="btn-cast-wrapper" style="display:none">
-                        <google-cast-launcher style="width: 24px; height: 24px; display: inline-block; cursor: pointer;"></google-cast-launcher>
+                        <google-cast-launcher
+                            style="width: 24px; height: 24px; display: inline-block; cursor: pointer;"></google-cast-launcher>
                     </div>
 
                     <!-- PIP -->
                     <button class="ctrl-btn" id="btn-pip" title="PIP 모드 (P)">
                         <svg viewBox="0 0 24 24">
-                            <path d="M19 7h-8v6h8V7zm2-4H3c-1.1 0-2 .9-2 2v14c0 1.1.9 1.98 2 1.98h18c1.1 0 2-.88 2-1.98V5c0-1.1-.9-2-2-2zm0 16.01H3V4.98h18v14.03z"/>
+                            <path
+                                d="M19 7h-8v6h8V7zm2-4H3c-1.1 0-2 .9-2 2v14c0 1.1.9 1.98 2 1.98h18c1.1 0 2-.88 2-1.98V5c0-1.1-.9-2-2-2zm0 16.01H3V4.98h18v14.03z" />
                         </svg>
                     </button>
 
@@ -311,18 +318,19 @@
     <div id="image-viewer" class="hidden">
         <button id="btn-close-image" title="닫기">
             <svg viewBox="0 0 24 24">
-                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                <path
+                    d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
             </svg>
         </button>
         <button class="img-nav-btn prev-btn" id="btn-prev-image" title="이전 이미지 (좌측 방향키)">
             <svg viewBox="0 0 24 24">
-                <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
+                <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z" />
             </svg>
         </button>
         <img id="viewer-img" src="" alt="Viewed Image">
         <button class="img-nav-btn next-btn" id="btn-next-image" title="다음 이미지 (우측 방향키)">
             <svg viewBox="0 0 24 24">
-                <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+                <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
             </svg>
         </button>
         <div id="image-info">
@@ -339,8 +347,10 @@
     <div id="custom-dialog" class="modal">
         <div class="modal-content" style="width: 320px; padding: 24px; text-align: center;">
             <h3 id="dialog-title" style="margin-bottom: 12px; font-size: 18px;"></h3>
-            <p id="dialog-message" style="color: #a1a1aa; font-size: 14px; margin-bottom: 20px; word-break: keep-all;"></p>
-            <input type="text" id="dialog-input" class="auth-input" style="display: none; margin-bottom: 20px;" autocomplete="off">
+            <p id="dialog-message" style="color: #a1a1aa; font-size: 14px; margin-bottom: 20px; word-break: keep-all;">
+            </p>
+            <input type="text" id="dialog-input" class="auth-input" style="display: none; margin-bottom: 20px;"
+                autocomplete="off">
             <div style="display: flex; gap: 8px; justify-content: flex-end;">
                 <button id="btn-dialog-cancel" class="btn-secondary" style="flex: 1;">취소</button>
                 <button id="btn-dialog-confirm" class="btn-primary" style="flex: 1;">확인</button>

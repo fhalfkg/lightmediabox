@@ -197,8 +197,8 @@ function sortVideos(videos) {
             valA = a.file_name.toLowerCase();
             valB = b.file_name.toLowerCase();
         } else if (currentSortBy === 'duration') {
-            valA = a.duration || 0;
-            valB = b.duration || 0;
+            valA = a.type === 'image' ? -1 : (a.duration || 0);
+            valB = b.type === 'image' ? -1 : (b.duration || 0);
         } else if (currentSortBy === 'size') {
             valA = a.file_size || 0;
             valB = b.file_size || 0;
@@ -389,7 +389,7 @@ function renderVideoChunk() {
         sentinel.style.width = '100%';
         sentinel.style.gridColumn = '1 / -1';
         libraryGrid.appendChild(sentinel);
-        
+
         if (intersectionObserver) {
             intersectionObserver.observe(sentinel);
         }
@@ -1327,7 +1327,7 @@ formLogin.onsubmit = async (e) => {
 
         if (data.success && data.require2FA) {
             formLogin.submit(); // 로그인 성공 시에만 브라우저 암호 저장 유도
-            
+
             const { SimpleWebAuthnBrowser } = window;
             if (!data.hasPasskey) {
                 // 최초 로그인: 패스키 등록
@@ -1410,7 +1410,7 @@ const btnCastWrapper = document.getElementById('btn-cast-wrapper');
 
 // 1. AirPlay (Safari 전용)
 if (window.WebKitPlaybackTargetAvailabilityEvent) {
-    videoPlayer.addEventListener('webkitplaybacktargetavailabilitychanged', function(event) {
+    videoPlayer.addEventListener('webkitplaybacktargetavailabilitychanged', function (event) {
         if (event.availability === 'available') {
             btnAirplay.style.display = 'block';
         } else {
@@ -1418,7 +1418,7 @@ if (window.WebKitPlaybackTargetAvailabilityEvent) {
         }
     });
 
-    btnAirplay.addEventListener('click', function() {
+    btnAirplay.addEventListener('click', function () {
         videoPlayer.webkitShowPlaybackTargetPicker();
     });
 }
@@ -1426,7 +1426,7 @@ if (window.WebKitPlaybackTargetAvailabilityEvent) {
 // 2. Google Cast (Chromecast)
 let castSession = null;
 
-window.__onGCastApiAvailable = function(isAvailable) {
+window.__onGCastApiAvailable = function (isAvailable) {
     if (isAvailable) {
         initializeCastApi();
     }
@@ -1441,7 +1441,7 @@ function initializeCastApi() {
     btnCastWrapper.style.display = 'inline-block';
 
     const context = cast.framework.CastContext.getInstance();
-    context.addEventListener(cast.framework.CastContextEventType.SESSION_STATE_CHANGED, function(event) {
+    context.addEventListener(cast.framework.CastContextEventType.SESSION_STATE_CHANGED, function (event) {
         if (event.sessionState === cast.framework.SessionState.SESSION_STARTED || event.sessionState === cast.framework.SessionState.SESSION_RESUMED) {
             castSession = context.getCurrentSession();
             castCurrentVideo();
@@ -1456,7 +1456,7 @@ function castCurrentVideo() {
 
     const origin = window.location.origin;
     let url = '';
-    
+
     // HLS.js나 native 플레이어에 공급되는 url과 동일하게 전송
     if (currentQuality === 'original') {
         url = `${origin}/api/video/${currentVideoId}/direct?token=${window.streamToken || ''}`;
@@ -1465,7 +1465,7 @@ function castCurrentVideo() {
     }
 
     const mediaInfo = new chrome.cast.media.MediaInfo(url, currentQuality === 'original' ? 'video/mp4' : 'application/x-mpegURL');
-    
+
     const videoData = allVideos.find(v => String(v.id) === String(currentVideoId));
     if (videoData) {
         const metadata = new chrome.cast.media.GenericMediaMetadata();
@@ -1477,10 +1477,10 @@ function castCurrentVideo() {
     request.currentTime = videoPlayer.currentTime;
 
     castSession.loadMedia(request).then(
-        function() { 
-            console.log('✅ 크롬캐스트로 전송 완료'); 
+        function () {
+            console.log('✅ 크롬캐스트로 전송 완료');
             videoPlayer.pause();
         },
-        function(e) { console.error('❌ 크롬캐스트 전송 에러', e); }
+        function (e) { console.error('❌ 크롬캐스트 전송 에러', e); }
     );
 }
