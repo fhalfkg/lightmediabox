@@ -213,6 +213,14 @@ router.get('/browse', (req, res) => {
                 const pattern = absoluteFolderPath + path.sep + '%';
                 const randomVideo = db.prepare('SELECT id FROM videos WHERE file_path LIKE ? ORDER BY RANDOM() LIMIT 1').get(pattern) as { id: number } | undefined;
                 
+                const typeCounts = db.prepare('SELECT type, COUNT(*) as count FROM videos WHERE file_path LIKE ? GROUP BY type').all(pattern) as { type: string, count: number }[];
+                let videoCount = 0;
+                let imageCount = 0;
+                typeCounts.forEach(r => {
+                    if (r.type === 'video') videoCount = r.count;
+                    if (r.type === 'image') imageCount = r.count;
+                });
+                
                 let thumbnail_url = undefined;
                 if (randomVideo) {
                     const hash = crypto.createHash('md5').update(randomVideo.id.toString()).digest('hex');
@@ -223,7 +231,9 @@ router.get('/browse', (req, res) => {
                 return {
                     name: e.name,
                     path: folderPath,
-                    thumbnail_url
+                    thumbnail_url,
+                    videoCount,
+                    imageCount
                 };
             })
             .sort((a, b) => a.name.localeCompare(b.name));

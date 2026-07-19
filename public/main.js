@@ -318,8 +318,21 @@ function renderLibrary() {
                         `;
             }
 
+            let countsHtml = '';
+            if (folder.videoCount > 0 || folder.imageCount > 0) {
+                countsHtml = '<div class="folder-counts">';
+                if (folder.videoCount > 0) {
+                    countsHtml += `<div>🎥 ${folder.videoCount}</div>`;
+                }
+                if (folder.imageCount > 0) {
+                    countsHtml += `<div>🖼️ ${folder.imageCount}</div>`;
+                }
+                countsHtml += '</div>';
+            }
+
             card.innerHTML = `
                         ${thumbHtml}
+                        ${countsHtml}
                         <div class="card-info">
                             <div class="card-title">${folder.name}</div>
                         </div>
