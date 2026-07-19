@@ -129,6 +129,19 @@ let currentSortBy = 'name'; // 'name' | 'duration' | 'size' | 'resolution'
 let currentSortOrder = 'asc'; // 'asc' | 'desc'
 let lastLoadedData = { folders: [], videos: [] };
 
+let currentRenderLimit = 50;
+const RENDER_CHUNK_SIZE = 50;
+let intersectionObserver = null;
+let cachedSortedVideos = [];
+
+if (window.IntersectionObserver) {
+    intersectionObserver = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) {
+            loadMoreItems();
+        }
+    }, { rootMargin: '200px' });
+}
+
 const tabFolder = document.getElementById('tab-folder');
 const tabVideo = document.getElementById('tab-video');
 const sortSelect = document.getElementById('sort-select');
@@ -317,10 +330,24 @@ function renderLibrary() {
     }
 
     // 미디어 카드 (정렬 적용)
-    const sortedVideos = sortVideos(videos);
-    currentImages = sortedVideos.filter(v => v.type === 'image');
+    cachedSortedVideos = sortVideos(videos);
+    currentImages = cachedSortedVideos.filter(v => v.type === 'image');
+    currentRenderLimit = RENDER_CHUNK_SIZE;
 
-    sortedVideos.forEach(video => {
+    renderVideoChunk();
+}
+
+function renderVideoChunk() {
+    const oldSentinel = document.getElementById('scroll-sentinel');
+    if (oldSentinel) {
+        if (intersectionObserver) intersectionObserver.unobserve(oldSentinel);
+        oldSentinel.remove();
+    }
+
+    const currentCount = libraryGrid.querySelectorAll('.media-card.video-card, .media-card.image-card').length;
+    const itemsToRender = cachedSortedVideos.slice(currentCount, currentRenderLimit);
+
+    itemsToRender.forEach(video => {
         const card = document.createElement('div');
         card.className = `media-card ${video.type === 'image' ? 'image-card' : 'video-card'}`;
 
@@ -354,6 +381,26 @@ function renderLibrary() {
         };
         libraryGrid.appendChild(card);
     });
+
+    if (currentRenderLimit < cachedSortedVideos.length) {
+        const sentinel = document.createElement('div');
+        sentinel.id = 'scroll-sentinel';
+        sentinel.style.height = '1px';
+        sentinel.style.width = '100%';
+        sentinel.style.gridColumn = '1 / -1';
+        libraryGrid.appendChild(sentinel);
+        
+        if (intersectionObserver) {
+            intersectionObserver.observe(sentinel);
+        }
+    }
+}
+
+function loadMoreItems() {
+    if (currentRenderLimit < cachedSortedVideos.length) {
+        currentRenderLimit += RENDER_CHUNK_SIZE;
+        renderVideoChunk();
+    }
 }
 
 function updateTabsUI() {
