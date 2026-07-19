@@ -26,7 +26,7 @@
                 <div class="header-top-right">
                     <div class="view-tabs">
                         <button id="tab-folder" class="view-tab active">폴더</button>
-                        <button id="tab-video" class="view-tab">비디오</button>
+                        <button id="tab-video" class="view-tab">파일</button>
                     </div>
                     <button id="btn-logout" class="text-btn" title="로그아웃">
                         <svg viewBox="0 0 24 24">
@@ -304,6 +304,30 @@
                     </button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- ─── 이미지 뷰어 ─── -->
+    <div id="image-viewer" class="hidden">
+        <button id="btn-close-image" title="닫기">
+            <svg viewBox="0 0 24 24">
+                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+            </svg>
+        </button>
+        <button class="img-nav-btn prev-btn" id="btn-prev-image" title="이전 이미지 (좌측 방향키)">
+            <svg viewBox="0 0 24 24">
+                <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
+            </svg>
+        </button>
+        <img id="viewer-img" src="" alt="Viewed Image">
+        <button class="img-nav-btn next-btn" id="btn-next-image" title="다음 이미지 (우측 방향키)">
+            <svg viewBox="0 0 24 24">
+                <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+            </svg>
+        </button>
+        <div id="image-info">
+            <span id="image-index-text"></span>
+            <span id="image-title-text"></span>
         </div>
     </div>
 

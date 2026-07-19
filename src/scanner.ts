@@ -19,8 +19,10 @@ if (!fs.existsSync(THUMBNAIL_DIR)) fs.mkdirSync(THUMBNAIL_DIR, { recursive: true
 
 let watcher: FSWatcher | null = null;
 
-// 비디오 파일 확장자 필터
+// 비디오 및 이미지 파일 확장자 필터
 const VIDEO_EXTENSIONS = ['.mp4', '.mkv', '.avi', '.mov', '.webm'];
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+const MEDIA_EXTENSIONS = [...VIDEO_EXTENSIONS, ...IMAGE_EXTENSIONS];
 
 class TaskQueue {
     private queue: (() => Promise<void>)[] = [];
@@ -129,22 +131,40 @@ const generateThumbnail = (filePath: string, id: number | bigint): Promise<void>
 
         if (fs.existsSync(thumbInfo.absolutePath)) return resolve();
 
-        ffmpeg(filePath)
-            .outputOptions(['-pix_fmt yuvj420p'])
-            .screenshots({
-                timestamps: ['10%'],
-                filename: path.basename(thumbInfo.absolutePath),
-                folder: thumbInfo.folderPath,
-                size: '480x?'
-            })
-            .on('end', () => {
-                console.log(`🖼️ 썸네일 생성 완료: ${thumbInfo.url}`);
-                resolve();
-            })
-            .on('error', (err) => {
-                console.error(`❌ 썸네일 생성 실패 (${id}):`, err.message);
-                reject(err);
-            });
+        const ext = path.extname(filePath).toLowerCase();
+        const isImage = IMAGE_EXTENSIONS.includes(ext);
+
+        if (isImage) {
+            ffmpeg(filePath)
+                .outputOptions(['-vf', 'scale=480:-1'])
+                .output(thumbInfo.absolutePath)
+                .on('end', () => {
+                    console.log(`🖼️ 썸네일 생성 완료 (이미지): ${thumbInfo.url}`);
+                    resolve();
+                })
+                .on('error', (err) => {
+                    console.error(`❌ 썸네일 생성 실패 (이미지, ${id}):`, err.message);
+                    reject(err);
+                })
+                .run();
+        } else {
+            ffmpeg(filePath)
+                .outputOptions(['-pix_fmt yuvj420p'])
+                .screenshots({
+                    timestamps: ['10%'],
+                    filename: path.basename(thumbInfo.absolutePath),
+                    folder: thumbInfo.folderPath,
+                    size: '480x?'
+                })
+                .on('end', () => {
+                    console.log(`🖼️ 썸네일 생성 완료 (비디오): ${thumbInfo.url}`);
+                    resolve();
+                })
+                .on('error', (err) => {
+                    console.error(`❌ 썸네일 생성 실패 (비디오, ${id}):`, err.message);
+                    reject(err);
+                });
+        }
     });
 };
 
@@ -182,8 +202,8 @@ const generateMissingThumbnails = async () => {
 const insertVideoStmt = db.prepare(`
   INSERT INTO videos (
     file_name, file_path, file_size, duration, 
-    resolution, video_codec, audio_codec, container_format
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    resolution, video_codec, audio_codec, container_format, type
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 
 export const startScanner = () => {
@@ -223,7 +243,7 @@ export const startScanner = () => {
     watcher.on('add', async (filePath) => {
         const ext = path.extname(filePath).toLowerCase();
 
-        if (VIDEO_EXTENSIONS.includes(ext)) {
+        if (MEDIA_EXTENSIONS.includes(ext)) {
             if (processingFiles.has(filePath)) return;
             processingFiles.add(filePath);
 
@@ -232,16 +252,18 @@ export const startScanner = () => {
                     // 이미 DB에 존재하는 파일인지 확인 (경로 기준)
                     const existing: any = db.prepare('SELECT id FROM videos WHERE file_path = ?').get(filePath);
                     if (existing) {
-                        console.log(`➡️ 기존에 존재하는 비디오: ${path.basename(filePath)}`);
+                        console.log(`➡️ 기존에 존재하는 미디어: ${path.basename(filePath)}`);
                         // 파일은 있는데 썸네일이 없을 수 있으므로 큐에 생성 작업 추가
                         scannerQueue.add(() => generateThumbnail(filePath, existing.id).catch(() => { }));
                         return;
                     }
 
-                    console.log(`🎬 새 비디오 감지됨: ${path.basename(filePath)}`);
+                    console.log(`🎬 새 미디어 감지됨: ${path.basename(filePath)}`);
                     const fileName = path.basename(filePath);
                     const metadata = await extractMetadata(filePath);
                     console.log(`✅ 메타데이터 추출 완료: ${fileName}`);
+
+                    const mediaType = IMAGE_EXTENSIONS.includes(ext) ? 'image' : 'video';
 
                     // 트랜잭션으로 DB 삽입
                     const insert = db.transaction(() => {
@@ -253,7 +275,8 @@ export const startScanner = () => {
                             metadata.resolution,
                             metadata.videoCodec,
                             metadata.audioCodec,
-                            metadata.container
+                            metadata.container,
+                            mediaType
                         );
                     });
 
@@ -263,7 +286,7 @@ export const startScanner = () => {
                         scannerQueue.add(() => generateThumbnail(filePath, result.lastInsertRowid).catch(() => { }));
                     } catch (insertError: any) {
                         if (insertError.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-                            console.log(`➡️ 이미 등록된 비디오 (중복 무시됨): ${fileName}`);
+                            console.log(`➡️ 이미 등록된 미디어 (중복 무시됨): ${fileName}`);
                         } else {
                             throw insertError;
                         }
@@ -280,8 +303,8 @@ export const startScanner = () => {
     watcher.on('unlink', (filePath) => {
         const ext = path.extname(filePath).toLowerCase();
 
-        if (VIDEO_EXTENSIONS.includes(ext)) {
-            console.log(`🗑️ 비디오 삭제 감지됨: ${path.basename(filePath)}`);
+        if (MEDIA_EXTENSIONS.includes(ext)) {
+            console.log(`🗑️ 미디어 삭제 감지됨: ${path.basename(filePath)}`);
 
             // DB에서 해당 파일 레코드 찾기
             const existing: any = db.prepare('SELECT id FROM videos WHERE file_path = ?').get(filePath);

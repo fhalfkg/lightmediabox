@@ -101,6 +101,14 @@ const btnPip = document.getElementById('btn-pip');
 const iconFsEnter = document.getElementById('icon-fs-enter');
 const iconFsExit = document.getElementById('icon-fs-exit');
 
+const imageViewer = document.getElementById('image-viewer');
+const btnCloseImage = document.getElementById('btn-close-image');
+const btnPrevImage = document.getElementById('btn-prev-image');
+const btnNextImage = document.getElementById('btn-next-image');
+const viewerImg = document.getElementById('viewer-img');
+const imageIndexText = document.getElementById('image-index-text');
+const imageTitleText = document.getElementById('image-title-text');
+
 // ─── 주요 상태 및 변수 ───
 let hls = null;
 let currentVideoId = null;
@@ -111,7 +119,10 @@ let controlsTimeout = null;
 let isSeeking = false;
 let currentBrowsePath = '';
 let isPlayerMode = false;
+let isImageViewerMode = false;
 let isRepeat = false;
+let currentImages = [];
+let currentImageIndex = -1;
 
 let currentViewMode = 'folder'; // 'folder' | 'video'
 let currentSortBy = 'name'; // 'name' | 'duration' | 'size' | 'resolution'
@@ -140,6 +151,7 @@ function showLibrary() {
 
     playerView.classList.remove('visible');
     playerView.classList.add('hidden');
+    if (imageViewer) imageViewer.classList.add('hidden');
     libraryView.classList.remove('hidden');
 
     if (document.fullscreenElement) {
@@ -304,31 +316,42 @@ function renderLibrary() {
         });
     }
 
-    // 비디오 카드 (정렬 적용)
+    // 미디어 카드 (정렬 적용)
     const sortedVideos = sortVideos(videos);
+    currentImages = sortedVideos.filter(v => v.type === 'image');
+
     sortedVideos.forEach(video => {
         const card = document.createElement('div');
-        card.className = 'media-card video-card';
+        card.className = `media-card ${video.type === 'image' ? 'image-card' : 'video-card'}`;
 
-        let thumbHtml = '<div class="fallback-icon">🎬</div>';
+        let thumbHtml = `<div class="fallback-icon">${video.type === 'image' ? '🖼️' : '🎬'}</div>`;
         if (video.thumbnail_url) {
             thumbHtml += `<img class="thumb-bg" src="${video.thumbnail_url}?v=1" alt="thumbnail" onerror="this.parentElement.classList.add('no-thumb');">`;
         } else {
             card.classList.add('no-thumb');
         }
 
+        const durationHtml = video.type === 'image' ? '' : `<span>${formatTime(video.duration)}</span>`;
+        const resHtml = video.resolution && video.resolution !== 'unknown' ? `<span>${video.resolution}</span>` : '';
+
         card.innerHTML = `
                     ${thumbHtml}
                     <div class="card-info">
                         <div class="card-title">${video.file_name}</div>
                         <div class="card-meta">
-                            <span>${formatTime(video.duration)}</span>
-                            <span>${video.resolution}</span>
+                            ${durationHtml}
+                            ${resHtml}
                         </div>
                     </div>
                 `;
 
-        card.onclick = () => selectVideo(video.id);
+        card.onclick = () => {
+            if (video.type === 'image') {
+                showImageViewer(video.id);
+            } else {
+                selectVideo(video.id);
+            }
+        };
         libraryGrid.appendChild(card);
     });
 }
@@ -381,6 +404,48 @@ btnBackFolder.onclick = () => {
         : '';
     browsePath(parent);
 };
+
+// ─── 이미지 뷰어 로직 ───
+function showImageViewer(id) {
+    isImageViewerMode = true;
+    document.body.classList.add('player-mode');
+    libraryView.classList.add('hidden');
+    if (imageViewer) imageViewer.classList.remove('hidden');
+
+    currentImageIndex = currentImages.findIndex(img => img.id === id);
+    if (currentImageIndex !== -1) {
+        loadImage(currentImageIndex);
+    }
+}
+
+function loadImage(index) {
+    if (index < 0 || index >= currentImages.length) return;
+    const imgData = currentImages[index];
+    if (viewerImg) viewerImg.src = `/api/image/${imgData.id}?token=${window.streamToken || ''}`;
+    if (imageIndexText) imageIndexText.textContent = `${index + 1} / ${currentImages.length}`;
+    if (imageTitleText) imageTitleText.textContent = imgData.file_name;
+
+    if (btnPrevImage) btnPrevImage.style.display = index > 0 ? 'flex' : 'none';
+    if (btnNextImage) btnNextImage.style.display = index < currentImages.length - 1 ? 'flex' : 'none';
+}
+
+if (btnCloseImage) btnCloseImage.onclick = showLibrary;
+if (btnPrevImage) {
+    btnPrevImage.onclick = () => {
+        if (currentImageIndex > 0) {
+            currentImageIndex--;
+            loadImage(currentImageIndex);
+        }
+    };
+}
+if (btnNextImage) {
+    btnNextImage.onclick = () => {
+        if (currentImageIndex < currentImages.length - 1) {
+            currentImageIndex++;
+            loadImage(currentImageIndex);
+        }
+    };
+}
 
 // ─── 영상 선택 및 재생 ───
 async function selectVideo(id) {
@@ -707,6 +772,22 @@ playerWrapper.addEventListener('mouseleave', () => {
 
 // ─── 키보드 단축키 ───
 document.addEventListener('keydown', (e) => {
+    if (isImageViewerMode) {
+        if (e.key === 'Escape') {
+            showLibrary();
+            return;
+        }
+        if (e.key === 'ArrowLeft' && currentImageIndex > 0) {
+            currentImageIndex--;
+            loadImage(currentImageIndex);
+        }
+        if (e.key === 'ArrowRight' && currentImageIndex < currentImages.length - 1) {
+            currentImageIndex++;
+            loadImage(currentImageIndex);
+        }
+        return;
+    }
+
     if (!isPlayerMode) return;
 
     // 플레이어 모드에서 ESC 누르면 라이브러리로 복귀 (전체화면 아닐 때만)

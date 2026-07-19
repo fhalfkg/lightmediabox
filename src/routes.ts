@@ -168,6 +168,8 @@ router.get('/system-browse', (req, res) => {
 // ─── API 라우터 ───
 
 const VIDEO_EXTENSIONS = ['.mp4', '.mkv', '.avi', '.mov', '.webm'];
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+const MEDIA_EXTENSIONS = [...VIDEO_EXTENSIONS, ...IMAGE_EXTENSIONS];
 
 router.get('/videos', (req, res) => {
     const videos: any[] = db.prepare('SELECT * FROM videos ORDER BY id DESC').all();
@@ -230,10 +232,10 @@ router.get('/browse', (req, res) => {
             })
             .sort((a, b) => a.name.localeCompare(b.name));
 
-        // 현재 폴더 내 비디오 파일 (DB에서 조회)
+        // 현재 폴더 내 미디어 파일 (DB에서 조회)
         const videos: any[] = [];
         entries
-            .filter(e => e.isFile() && VIDEO_EXTENSIONS.includes(path.extname(e.name).toLowerCase()))
+            .filter(e => e.isFile() && MEDIA_EXTENSIONS.includes(path.extname(e.name).toLowerCase()))
             .forEach(e => {
                 const fullPath = path.join(targetDir, e.name);
                 const video = db.prepare('SELECT * FROM videos WHERE file_path = ?').get(fullPath) as VideoRecord | undefined;
@@ -260,6 +262,16 @@ router.get('/browse', (req, res) => {
         console.error('폴더 탐색 오류:', err);
         res.status(500).json({ error: '폴더 탐색 중 오류가 발생했습니다.' });
     }
+});
+
+// ⚡ 이미지 원본 제공 API
+router.get('/image/:id', (req, res) => {
+    const { id } = req.params;
+    const media: any = db.prepare('SELECT * FROM videos WHERE id = ?').get(id);
+    if (!media || !fs.existsSync(media.file_path) || media.type !== 'image') {
+        return res.status(404).send('이미지를 찾을 수 없습니다.');
+    }
+    res.sendFile(media.file_path);
 });
 
 // ⚡ 화질 목록 API (프론트엔드 화질 메뉴에 사용)

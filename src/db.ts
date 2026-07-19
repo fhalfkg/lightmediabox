@@ -17,6 +17,7 @@ db.exec(`
     video_codec TEXT,
     audio_codec TEXT,
     container_format TEXT,
+    type TEXT DEFAULT 'video',
     scanned_at DATETIME DEFAULT CURRENT_TIMESTAMP  
   );
 
@@ -60,6 +61,10 @@ try {
 
 try {
   db.exec('ALTER TABLE passkeys ADD COLUMN device_name TEXT;');
+} catch (err) { /* 이미 존재하는 경우 무시 */ }
+
+try {
+  db.exec('ALTER TABLE videos ADD COLUMN type TEXT DEFAULT \'video\';');
 } catch (err) { /* 이미 존재하는 경우 무시 */ }
 
 console.log('✅ 데이터베이스 테이블 및 인덱스 초기화 완료');
