@@ -27,6 +27,23 @@ const SESSION_TIMEOUT_MS = 5 * 60 * 1000;
 
 const getStreamKey = (id: string, quality: string) => `${id}_${quality}`;
 
+let availableEncoders: Set<string> | null = null;
+const checkEncoder = async (codec: string): Promise<boolean> => {
+    if (codec === 'copy' || codec === 'libx264') return true;
+    return new Promise((resolve) => {
+        if (availableEncoders) return resolve(availableEncoders.has(codec));
+        ffmpeg.getAvailableEncoders((err, encoders) => {
+            availableEncoders = new Set();
+            if (!err && encoders) {
+                for (const key in encoders) {
+                    availableEncoders.add(key);
+                }
+            }
+            resolve(availableEncoders.has(codec));
+        });
+    });
+};
+
 const cleanupStream = (id: string, quality?: string) => {
     if (quality) {
         // 특정 화질만 정리
@@ -445,7 +462,7 @@ router.get('/hls/:id/:quality/index.m3u8', (req, res) => {
 });
 
 // TS 조각 파일 생성 라우터
-router.get('/hls/:id/:quality/:file', (req, res) => {
+router.get('/hls/:id/:quality/:file', async (req, res) => {
     const { id, quality, file } = req.params;
     const video = db.prepare('SELECT * FROM videos WHERE id = ?').get(id) as VideoRecord | undefined;
     if (!video) return res.status(404).send('비디오를 찾을 수 없습니다.');
@@ -529,6 +546,12 @@ router.get('/hls/:id/:quality/:file', (req, res) => {
                 if (row && row.value) vCodec = row.value;
             } catch (e) {}
 
+            const isSupported = await checkEncoder(vCodec);
+            if (!isSupported) {
+                console.warn(`⚠️ [ID: ${id}] ${quality} 화질 인코딩 중 선택된 인코더(${vCodec})를 지원하지 않아 libx264로 자동 전환합니다.`);
+                vCodec = 'libx264';
+            }
+
             let aCodec = 'aac';
             if (!needsScale && video.video_codec === 'h264' && video.audio_codec === 'aac') {
                 vCodec = 'copy';
@@ -558,6 +581,10 @@ router.get('/hls/:id/:quality/:file', (req, res) => {
                 '-hls_segment_filename', path.join(outDir, 'stream%d.ts'),
                 '-f', 'hls'
             ];
+
+            if (vCodec !== 'copy') {
+                outputOptions.push('-pix_fmt', 'yuv420p');
+            }
 
             // PTS 시간 동기화 (재생 시간이 리셋되지 않고 startTime부터 시작되도록 강제)
             if (startTime > 0) {
