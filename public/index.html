@@ -90,6 +90,7 @@
                 <div class="settings-tabs">
                     <button class="settings-tab active" data-target="settings-account">계정 정보</button>
                     <button class="settings-tab" data-target="settings-library">라이브러리</button>
+                    <button class="settings-tab" data-target="settings-transcoding">트랜스코딩</button>
                 </div>
             </div>
             <div class="settings-main">
@@ -158,9 +159,47 @@
                             <!-- 폴더 목록이 여기에 로드됩니다 -->
                         </div>
                         <small>경로를 변경하면 데이터베이스와 썸네일이 초기화되고 새로 스캔합니다.</small>
+                        
+                        <div style="margin-top: 24px;">
+                            <button class="btn-primary btn-settings-save">변경사항 저장</button>
+                        </div>
                     </div>
-                    <div class="modal-actions" style="margin-top: 24px;">
-                        <button id="btn-settings-save" class="btn-primary">변경사항 저장</button>
+                </div>
+
+                <!-- 트랜스코딩 탭 패널 -->
+                <div id="settings-transcoding" class="settings-pane">
+                    <h3>트랜스코딩 (하드웨어 가속)</h3>
+                    
+                    <div class="form-group" style="margin-top: 16px;">
+                        <label>감지된 하드웨어</label>
+                        <input type="text" id="settings-gpu-info" disabled class="auth-input" style="background: rgba(255,255,255,0.02); color: #a78bfa;" value="조회 중...">
+                    </div>
+                    
+                    <div class="form-group" style="margin-top: 24px;">
+                        <label>사용할 인코더 선택</label>
+                        <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 8px;">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #fff; font-size: 14px; font-weight: normal;">
+                                <input type="radio" name="transcoder_codec" value="libx264" checked>
+                                <span>[기본] 범용 CPU (libx264)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #fff; font-size: 14px; font-weight: normal;">
+                                <input type="radio" name="transcoder_codec" value="h264_nvenc">
+                                <span>[NVIDIA] 외장 그래픽 (h264_nvenc)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #fff; font-size: 14px; font-weight: normal;">
+                                <input type="radio" name="transcoder_codec" value="h264_amf">
+                                <span>[AMD] Radeon 그래픽 (h264_amf)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #fff; font-size: 14px; font-weight: normal;">
+                                <input type="radio" name="transcoder_codec" value="h264_qsv">
+                                <span>[Intel] 내장 그래픽 (h264_qsv)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                        <div style="margin-top: 24px;">
+                            <button class="btn-primary btn-settings-save">변경사항 저장</button>
+                        </div>
                     </div>
                 </div>
             </div>

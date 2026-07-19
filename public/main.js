@@ -1005,7 +1005,7 @@ function hideLoading() {
 const btnSettings = document.getElementById('btn-settings');
 const settingsModal = document.getElementById('settings-modal');
 const btnSettingsClose = document.getElementById('btn-settings-close');
-const btnSettingsSave = document.getElementById('btn-settings-save');
+const btnSettingsSaves = document.querySelectorAll('.btn-settings-save');
 const inputMediaDir = document.getElementById('input-media-dir');
 
 // 탭 전환 로직
@@ -1202,14 +1202,47 @@ if (formChangePassword) {
     };
 }
 
+async function loadTranscoderSettings() {
+    try {
+        const gpuInfo = document.getElementById('settings-gpu-info');
+        if (gpuInfo) {
+            if (gpuInfo.tagName === 'INPUT') gpuInfo.value = '조회 중...';
+            else gpuInfo.innerText = '조회 중...';
+        }
+        const res = await fetch('/api/settings/transcoder');
+        const data = await res.json();
+        
+        if (gpuInfo) {
+            if (gpuInfo.tagName === 'INPUT') gpuInfo.value = data.gpu || '알 수 없는 하드웨어';
+            else gpuInfo.innerText = data.gpu || '알 수 없는 하드웨어';
+        }
+        
+        const radios = document.getElementsByName('transcoder_codec');
+        for (let r of radios) {
+            if (r.value === data.codec) {
+                r.checked = true;
+                break;
+            }
+        }
+    } catch (err) {
+        console.error('트랜스코더 설정 로드 오류:', err);
+        const gpuInfo = document.getElementById('settings-gpu-info');
+        if (gpuInfo) {
+            if (gpuInfo.tagName === 'INPUT') gpuInfo.value = '불러오기 실패';
+            else gpuInfo.innerText = '불러오기 실패';
+        }
+    }
+}
+
 btnSettings.onclick = async () => {
     try {
         const res = await fetch('/api/config');
         const config = await res.json();
         inputMediaDir.value = config.mediaDir || '';
 
-        // 설정 창 열릴 때 계정 정보도 함께 로드
+        // 설정 창 열릴 때 계정 정보 및 트랜스코딩 정보 로드
         loadAccountInfo();
+        loadTranscoderSettings();
 
         settingsModal.classList.add('visible');
     } catch (err) {
@@ -1221,36 +1254,54 @@ btnSettingsClose.onclick = () => {
     settingsModal.classList.remove('visible');
 };
 
-btnSettingsSave.onclick = async () => {
-    const newDir = inputMediaDir.value.trim();
-    if (!newDir) return showToast('경로를 입력해주세요.', 'error');
+btnSettingsSaves.forEach(btn => {
+    btn.onclick = async () => {
+        const newDir = inputMediaDir.value.trim();
+        if (!newDir) return showToast('경로를 입력해주세요.', 'error');
 
-    try {
-        showLoading('경로를 변경하고 스캔하는 중입니다...');
-        settingsModal.classList.remove('visible');
-
-        const res = await fetch('/api/config', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mediaDir: newDir })
-        });
-
-        const data = await res.json();
-        if (data.success) {
-            // 성공 시 뷰 전환(폴더뷰로) 및 초기 경로 재로드
-            currentViewMode = 'folder';
-            updateTabsUI();
-            browsePath('');
-        } else {
-            showToast('경로 변경 실패: ' + (data.error || '알 수 없는 오류'), 'error');
+        let selectedCodec = 'libx264';
+        const radios = document.getElementsByName('transcoder_codec');
+        for (let r of radios) {
+            if (r.checked) {
+                selectedCodec = r.value;
+                break;
+            }
         }
-    } catch (err) {
-        console.error(err);
-        showToast('설정 저장 중 오류가 발생했습니다: ' + err.message, 'error');
-    } finally {
-        hideLoading();
-    }
-};
+
+        try {
+            showLoading('설정을 적용하고 있습니다...');
+            settingsModal.classList.remove('visible');
+
+            const resConfig = await fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mediaDir: newDir })
+            });
+            
+            await fetch('/api/settings/transcoder', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ codec: selectedCodec })
+            });
+
+            const data = await resConfig.json();
+            if (data.success) {
+                // 성공 시 뷰 전환(폴더뷰로) 및 초기 경로 재로드
+                currentViewMode = 'folder';
+                updateTabsUI();
+                browsePath('');
+                showToast('설정이 성공적으로 저장되었습니다.', 'success');
+            } else {
+                showToast('경로 변경 실패: ' + (data.error || '알 수 없는 오류'), 'error');
+            }
+        } catch (err) {
+            console.error(err);
+            showToast('설정 중 오류가 발생했습니다: ' + err.message, 'error');
+        } finally {
+            hideLoading();
+        }
+    };
+});
 
 // ─── 시스템 폴더 브라우저 ───
 const btnBrowsePath = document.getElementById('btn-browse-path');

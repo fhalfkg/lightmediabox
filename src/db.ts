@@ -60,6 +60,18 @@ try {
 } catch (err) { /* 이미 존재하는 경우 무시 */ }
 
 try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `);
+  db.exec("INSERT OR IGNORE INTO settings (key, value) VALUES ('transcoder_codec', 'libx264');");
+} catch (err) {
+  console.error('설정 테이블 초기화 오류:', err);
+}
+
+try {
   db.exec('ALTER TABLE passkeys ADD COLUMN device_name TEXT;');
 } catch (err) { /* 이미 존재하는 경우 무시 */ }
 

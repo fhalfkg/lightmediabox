@@ -107,6 +107,44 @@ router.post('/config', async (req, res) => {
 });
 
 // ⚡ 시스템 폴더 브라우징 API (설정 모달용)
+// ─── API: 시스템 하드웨어 및 트랜스코딩 설정 조회 ───
+router.get('/settings/transcoder', (req, res) => {
+    let gpuInfo = '알 수 없는 하드웨어';
+    try {
+        if (os.platform() === 'win32') {
+            const gpu = cp.execSync('powershell "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name"', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+            if (gpu) {
+                gpuInfo = gpu.split('\n')[0].trim();
+            } else {
+                const cpu = cp.execSync('powershell "Get-CimInstance Win32_Processor | Select-Object -ExpandProperty Name"', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+                if (cpu) gpuInfo = cpu;
+            }
+        }
+    } catch (e) {}
+
+    let codec = 'libx264';
+    try {
+        const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('transcoder_codec') as { value: string } | undefined;
+        if (row) codec = row.value;
+    } catch (e) {}
+
+    res.json({ gpu: gpuInfo, codec });
+});
+
+// ─── API: 트랜스코딩 설정 업데이트 ───
+router.put('/settings/transcoder', (req, res) => {
+    const { codec } = req.body;
+    if (!codec) return res.status(400).json({ error: '코덱 값이 없습니다.' });
+
+    try {
+        db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?').run('transcoder_codec', codec, codec);
+        res.json({ success: true });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: '설정 저장 중 오류가 발생했습니다.' });
+    }
+});
+
 router.get('/system-browse', (req, res) => {
     let targetPath = (req.query.path as string) || '';
 
@@ -458,6 +496,11 @@ router.get('/hls/:id/:quality/:file', (req, res) => {
 
             // A/V 싱크를 위해 둘 다 copy 하거나 둘 다 인코딩
             let vCodec = 'libx264';
+            try {
+                const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('transcoder_codec') as { value: string } | undefined;
+                if (row && row.value) vCodec = row.value;
+            } catch (e) {}
+
             let aCodec = 'aac';
             if (!needsScale && video.video_codec === 'h264' && video.audio_codec === 'aac') {
                 vCodec = 'copy';
@@ -499,6 +542,15 @@ router.get('/hls/:id/:quality/:file', (req, res) => {
 
             if (vCodec === 'libx264') {
                 outputOptions.push('-preset', 'ultrafast');
+            } else if (vCodec === 'h264_nvenc') {
+                outputOptions.push('-preset', 'p1');
+            } else if (vCodec === 'h264_qsv') {
+                outputOptions.push('-preset', 'veryfast');
+            } else if (vCodec === 'h264_amf') {
+                outputOptions.push('-quality', 'speed');
+            }
+
+            if (vCodec !== 'copy') {
                 outputOptions.push('-g', '60');
                 outputOptions.push('-sc_threshold', '0');
                 // HLS 탐색 시 깨짐 방지를 위해 반드시 Closed GOP 사용
