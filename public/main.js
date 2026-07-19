@@ -1064,7 +1064,7 @@ async function loadAccountInfo() {
                 html += `
                             <li style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 6px;">
                                 <div style="display: flex; align-items: center;">
-                                    ${getIcon(pk.device_name)}
+                                    ${getIcon(pk.name)}
                                     <div>
                                         <div style="font-size: 14px; color: #fff; font-weight: 500;">${pk.name}</div>
                                         <div style="font-size: 12px; color: #a1a1aa;">등록일: ${formatDate(pk.created_at)}</div>
