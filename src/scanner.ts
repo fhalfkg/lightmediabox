@@ -140,21 +140,22 @@ const generateThumbnail = (filePath: string, id: number | bigint, videoCodec?: s
 
         const ext = path.extname(filePath).toLowerCase();
         const isImage = IMAGE_EXTENSIONS.includes(ext);
+        const tmpPath = thumbInfo.absolutePath.replace(/\.jpg$/, '_tmp.jpg');
 
         if (isImage) {
             ffmpeg(filePath)
                 .outputOptions(['-vf', 'scale=480:-1'])
-                .output(thumbInfo.absolutePath + '.tmp')
+                .output(tmpPath)
                 .on('end', () => {
-                    if (fs.existsSync(thumbInfo.absolutePath + '.tmp')) {
-                        fs.renameSync(thumbInfo.absolutePath + '.tmp', thumbInfo.absolutePath);
+                    if (fs.existsSync(tmpPath)) {
+                        fs.renameSync(tmpPath, thumbInfo.absolutePath);
                     }
                     console.log(`🖼️ 썸네일 생성 완료 (이미지): ${thumbInfo.url}`);
                     resolve();
                 })
                 .on('error', (err) => {
                     console.error(`❌ 썸네일 생성 실패 (이미지, ${filePath}):`, err.message);
-                    if (fs.existsSync(thumbInfo.absolutePath + '.tmp')) fs.unlinkSync(thumbInfo.absolutePath + '.tmp');
+                    if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
                     reject(err);
                 })
                 .run();
@@ -170,20 +171,20 @@ const generateThumbnail = (filePath: string, id: number | bigint, videoCodec?: s
                 .outputOptions(['-pix_fmt yuvj420p'])
                 .screenshots({
                     timestamps: ['10%'],
-                    filename: path.basename(thumbInfo.absolutePath) + '.tmp',
+                    filename: path.basename(tmpPath),
                     folder: thumbInfo.folderPath,
                     size: '480x?'
                 })
                 .on('end', () => {
-                    if (fs.existsSync(thumbInfo.absolutePath + '.tmp')) {
-                        fs.renameSync(thumbInfo.absolutePath + '.tmp', thumbInfo.absolutePath);
+                    if (fs.existsSync(tmpPath)) {
+                        fs.renameSync(tmpPath, thumbInfo.absolutePath);
                     }
                     console.log(`🖼️ 썸네일 생성 완료 (비디오): ${thumbInfo.url}`);
                     resolve();
                 })
                 .on('error', (err) => {
                     console.error(`❌ 썸네일 생성 실패 (비디오, ${filePath}):`, err.message);
-                    if (fs.existsSync(thumbInfo.absolutePath + '.tmp')) fs.unlinkSync(thumbInfo.absolutePath + '.tmp');
+                    if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
                     reject(err);
                 });
         }
