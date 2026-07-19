@@ -250,6 +250,15 @@
                 뒤로 가기
             </button>
 
+            <!-- 우상단 오버레이 (Cast 등) -->
+            <div id="top-right-controls">
+                <!-- Chromecast -->
+                <div class="ctrl-btn" id="btn-cast-wrapper" style="display:none">
+                    <google-cast-launcher
+                        style="width: 24px; height: 24px; display: inline-block; cursor: pointer;"></google-cast-launcher>
+                </div>
+            </div>
+
             <video id="video-player" playsinline></video>
 
             <!-- 로딩 오버레이 -->
@@ -340,11 +349,7 @@
                         </svg>
                     </button>
 
-                    <!-- Chromecast -->
-                    <div class="ctrl-btn" id="btn-cast-wrapper" style="display:none">
-                        <google-cast-launcher
-                            style="width: 24px; height: 24px; display: inline-block; cursor: pointer;"></google-cast-launcher>
-                    </div>
+
 
                     <!-- PIP -->
                     <button class="ctrl-btn" id="btn-pip" title="PIP 모드 (P)">

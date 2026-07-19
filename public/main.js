@@ -822,16 +822,18 @@ if (btnPip) {
         try {
             if (document.pictureInPictureElement) {
                 await document.exitPictureInPicture();
-            } else if (videoPlayer.requestPictureInPicture) {
+            } else if (document.pictureInPictureEnabled && videoPlayer.requestPictureInPicture) {
                 await videoPlayer.requestPictureInPicture();
-            } else if (videoPlayer.webkitSetPresentationMode) {
+            } else if (videoPlayer.webkitSupportsPresentationMode && videoPlayer.webkitSupportsPresentationMode('picture-in-picture')) {
                 videoPlayer.webkitSetPresentationMode(
                     videoPlayer.webkitPresentationMode === 'picture-in-picture' ? 'inline' : 'picture-in-picture'
                 );
+            } else {
+                showToast('이 브라우저 또는 현재 비디오 상태에서는 PIP 기능을 지원하지 않습니다.', 'error');
             }
         } catch (err) {
             console.error('PIP 오류:', err);
-            showToast('이 브라우저에서는 PIP 기능을 지원하지 않습니다.', 'error');
+            showToast('PIP 모드 전환 중 오류가 발생했습니다.', 'error');
         }
     };
 }
