@@ -9,8 +9,10 @@ import crypto from 'crypto';
 import { VideoRecord } from './types';
 import { getConfig, saveConfig } from './config';
 import { startScanner, stopScanner } from './scanner';
+import { getFfmpegPath } from './setup-ffmpeg';
 
 const router = express.Router();
+ffmpeg.setFfmpegPath(getFfmpegPath());
 const HLS_TEMP_DIR = path.resolve(process.cwd(), 'hls_temp');
 const SEGMENT_TIME = 10;
 
@@ -33,11 +35,13 @@ const checkEncoder = async (codec: string): Promise<boolean> => {
     return new Promise((resolve) => {
         if (availableEncoders) return resolve(availableEncoders.has(codec));
         ffmpeg.getAvailableEncoders((err, encoders) => {
+            if (err || !encoders) {
+                console.error('인코더 목록 조회 실패:', err?.message);
+                return resolve(false);
+            }
             availableEncoders = new Set();
-            if (!err && encoders) {
-                for (const key in encoders) {
-                    availableEncoders.add(key);
-                }
+            for (const key in encoders) {
+                availableEncoders.add(key);
             }
             resolve(availableEncoders.has(codec));
         });
