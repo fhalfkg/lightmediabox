@@ -695,7 +695,10 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
 
     // 파일 생성 대기 (폴링)
     const serveFile = () => {
-        if (isSegmentReady()) return res.sendFile(filePath);
+        if (isSegmentReady()) {
+            res.setHeader('Cache-Control', 'public, max-age=3600');
+            return res.sendFile(filePath);
+        }
         
         let attempts = 0;
         const maxAttempts = 100; // 100 * 300ms = 30초 대기
@@ -703,6 +706,7 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
         const checkFileExists = setInterval(() => {
             if (isSegmentReady()) {
                 clearInterval(checkFileExists);
+                res.setHeader('Cache-Control', 'public, max-age=3600');
                 res.sendFile(filePath);
             } else {
                 attempts++;
