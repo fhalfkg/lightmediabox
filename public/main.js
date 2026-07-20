@@ -170,9 +170,9 @@ function showLibrary() {
     if (hls) {
         hls.destroy();
         hls = null;
-        if (currentVideoId) {
-            fetch(`/api/hls/${currentVideoId}/stop`, { method: 'POST' }).catch(() => {});
-        }
+    }
+    if (currentVideoId) {
+        fetch(`/api/hls/${currentVideoId}/stop`, { method: 'POST' }).catch(() => {});
     }
     currentVideoId = null;
     videoPlayer.pause();
@@ -195,6 +195,13 @@ function showLibrary() {
         document.exitFullscreen().catch(() => { });
     }
 }
+
+// 브라우저 탭 종료, 새로고침, 뒤로가기 시 인코딩 즉시 종료 처리
+window.addEventListener('beforeunload', () => {
+    if (currentVideoId) {
+        navigator.sendBeacon(`/api/hls/${currentVideoId}/stop`);
+    }
+});
 
 function showPlayer() {
     saveCurrentHistory();
