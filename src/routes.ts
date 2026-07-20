@@ -559,6 +559,7 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
             
             let targetHeight = 0;
             let targetBitrate = '';
+            let applyScaleFilter = needsScale;
             
             if (quality !== 'original') {
                 if (quality.includes('_')) {
@@ -567,6 +568,14 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
                     targetBitrate = parts[1];
                 } else {
                     targetHeight = parseInt(quality.replace('p', ''), 10);
+                }
+                
+                // 불필요한 스케일링 방지 (원본 세로 해상도와 목표 해상도가 같을 때)
+                if (video.resolution) {
+                    const [origW, origH] = video.resolution.split('x').map(Number);
+                    if (targetHeight === origH) {
+                        applyScaleFilter = false;
+                    }
                 }
             }
 
@@ -636,14 +645,14 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
             outputOptions.push('-output_ts_offset', String(startTime));
 
             if (vCodec === 'h264_vaapi') {
-                if (needsScale) {
+                if (applyScaleFilter) {
                     outputOptions.push('-vf', `format=nv12,hwupload,scale_vaapi=w=-2:h=${targetHeight}`);
                 } else {
-                    // 원본 화질일 때 픽셀 포맷 변환 및 하드웨어 업로드
+                    // 해상도 변경이 없을 때 픽셀 포맷 변환 및 하드웨어 업로드만 수행
                     outputOptions.push('-vf', 'format=nv12,hwupload');
                 }
             } else {
-                if (needsScale) {
+                if (applyScaleFilter) {
                     outputOptions.push('-vf', `scale=-2:${targetHeight}`);
                 }
             }
