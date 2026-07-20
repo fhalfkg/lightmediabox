@@ -570,7 +570,8 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
             }
 
             if (vCodec === 'h264_vaapi') {
-                inputOptions.push('-hwaccel', 'vaapi', '-hwaccel_device', '/dev/dri/renderD128', '-hwaccel_output_format', 'vaapi');
+                // -hwaccel_output_format vaapi를 제거하여 디코딩 실패 시(예: 10-bit H.264) 안전하게 소프트웨어 메모리로 폴백되도록 함
+                inputOptions.push('-hwaccel', 'vaapi', '-hwaccel_device', '/dev/dri/renderD128');
             }
             
             if (startTime > 0) {
@@ -600,10 +601,10 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
 
             if (vCodec === 'h264_vaapi') {
                 if (needsScale) {
-                    outputOptions.push('-vf', `scale_vaapi=w=-2:h=${quality.replace('p', '')}:format=nv12`);
+                    outputOptions.push('-vf', `format=nv12,hwupload,scale_vaapi=w=-2:h=${quality.replace('p', '')}`);
                 } else {
-                    // 원본 화질일 경우 스케일링 없이 픽셀 포맷(10bit -> 8bit 등)만 하드웨어에서 맞춤
-                    outputOptions.push('-vf', 'scale_vaapi=format=nv12');
+                    // 원본 화질일 경우 스케일링 없이 픽셀 포맷 맞춤 및 하드웨어 업로드
+                    outputOptions.push('-vf', 'format=nv12,hwupload');
                 }
             } else {
                 if (needsScale) {
