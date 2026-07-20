@@ -14,7 +14,7 @@ import { getFfmpegPath } from './setup-ffmpeg';
 const router = express.Router();
 ffmpeg.setFfmpegPath(getFfmpegPath());
 const HLS_TEMP_DIR = path.resolve(process.cwd(), 'hls_temp');
-const SEGMENT_TIME = 10;
+const SEGMENT_TIME = 3;
 
 if (!fs.existsSync(HLS_TEMP_DIR)) fs.mkdirSync(HLS_TEMP_DIR, { recursive: true });
 
