@@ -12,6 +12,14 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
     <script src="https://unpkg.com/@simplewebauthn/browser/dist/bundle/index.umd.min.js"></script>
+    <script>
+        window.__onGCastApiAvailable = function (isAvailable) {
+            window.isCastAvailable = isAvailable;
+            if (isAvailable && typeof window.initializeCastApi === 'function') {
+                window.initializeCastApi();
+            }
+        };
+    </script>
     <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
     <link rel="stylesheet" href="styles.css?v=5">
 </head>
@@ -292,10 +300,11 @@
                 </button>
 
                 <!-- Chromecast -->
-                <div class="ctrl-btn" id="btn-cast-wrapper" style="display:none">
-                    <google-cast-launcher
-                        style="width: 24px; height: 24px; display: inline-block; cursor: pointer;"></google-cast-launcher>
-                </div>
+                <button class="ctrl-btn" id="btn-cast-wrapper" style="display:none" title="Chromecast로 전송">
+                    <svg viewBox="0 0 24 24" style="transform: scale(0.9) translateY(2px);">
+                        <path d="M1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm0-4v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11zm20-7H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+                    </svg>
+                </button>
             </div>
 
             <video id="video-player" playsinline></video>

@@ -891,6 +891,7 @@ video {
     font-size: 13px;
     color: #d4d4d8;
     transition: all 0.15s ease;
+    white-space: nowrap;
 }
 
 .quality-option:hover {

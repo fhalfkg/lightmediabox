@@ -422,6 +422,12 @@ function renderVideoChunk() {
 
         const durationHtml = video.type === 'image' ? '' : `<span>${formatTime(video.duration)}</span>`;
         const resHtml = video.resolution && video.resolution !== 'unknown' ? `<span>${video.resolution}</span>` : '';
+        
+        let bitrateHtml = '';
+        if (video.type !== 'image' && video.file_size && video.duration > 0) {
+            const mbps = ((video.file_size * 8) / video.duration / 1000000).toFixed(1);
+            bitrateHtml = `<span>${mbps} Mbps</span>`;
+        }
 
         card.innerHTML = `
                     ${thumbHtml}
@@ -430,6 +436,7 @@ function renderVideoChunk() {
                         <div class="card-meta">
                             ${durationHtml}
                             ${resHtml}
+                            ${bitrateHtml}
                         </div>
                     </div>
                 `;
@@ -1588,19 +1595,27 @@ if (window.WebKitPlaybackTargetAvailabilityEvent) {
 // 2. Google Cast (Chromecast)
 let castSession = null;
 
-window.__onGCastApiAvailable = function (isAvailable) {
-    if (isAvailable) {
-        initializeCastApi();
-    }
-};
+if (window.isCastAvailable) {
+    window.initializeCastApi();
+}
 
-function initializeCastApi() {
+window.initializeCastApi = function() {
     cast.framework.CastContext.getInstance().setOptions({
         receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
         autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
     });
 
-    btnCastWrapper.style.display = 'flex';
+    btnCastWrapper.style.display = 'block';
+
+    btnCastWrapper.onclick = () => {
+        try {
+            cast.framework.CastContext.getInstance().requestSession().catch((err) => {
+                if (err !== 'cancel') console.error('Cast session request error:', err);
+            });
+        } catch (e) {
+            console.error('Cast API not ready', e);
+        }
+    };
 
     const context = cast.framework.CastContext.getInstance();
     context.addEventListener(cast.framework.CastContextEventType.SESSION_STATE_CHANGED, function (event) {

@@ -88,9 +88,24 @@ const getAvailableQualities = (resolution: string | null) => {
     const originalWidth = isNaN(w) ? 1920 : w;
 
     const qualities = [{ name: 'original', label: `원본 (${originalHeight}p)`, height: originalHeight, width: originalWidth }];
-    if (originalHeight > 1080) qualities.push({ name: '1080p', label: '1080p', height: 1080, width: 0 });
-    if (originalHeight > 720) qualities.push({ name: '720p', label: '720p', height: 720, width: 0 });
-    if (originalHeight > 480) qualities.push({ name: '480p', label: '480p', height: 480, width: 0 });
+    
+    if (originalHeight >= 2160) {
+        qualities.push({ name: '2160p_80M', label: '4K - 80 Mbps', height: 2160, width: 0 });
+        qualities.push({ name: '2160p_40M', label: '4K - 40 Mbps', height: 2160, width: 0 });
+    }
+    
+    if (originalHeight >= 1080) {
+        qualities.push({ name: '1080p_20M', label: '1080p - 20 Mbps', height: 1080, width: 0 });
+        qualities.push({ name: '1080p_10M', label: '1080p - 10 Mbps', height: 1080, width: 0 });
+    }
+    
+    if (originalHeight >= 720) {
+        qualities.push({ name: '720p_4M', label: '720p - 4 Mbps', height: 720, width: 0 });
+    }
+    
+    if (originalHeight >= 480) {
+        qualities.push({ name: '480p_1.5M', label: '480p - 1.5 Mbps', height: 480, width: 0 });
+    }
 
     return qualities;
 };
@@ -541,6 +556,19 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
             console.log(`🎬 [ID: ${id}] ${quality} 화질 인코딩 시작 (seq=${seq}, time=${startTime}s)`);
 
             const needsScale = quality !== 'original';
+            
+            let targetHeight = 0;
+            let targetBitrate = '';
+            
+            if (quality !== 'original') {
+                if (quality.includes('_')) {
+                    const parts = quality.split('_');
+                    targetHeight = parseInt(parts[0].replace('p', ''), 10);
+                    targetBitrate = parts[1];
+                } else {
+                    targetHeight = parseInt(quality.replace('p', ''), 10);
+                }
+            }
 
             // A/V 싱크를 위해 둘 다 copy 하거나 둘 다 인코딩
             let vCodec = 'libx264';
@@ -612,14 +640,23 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
 
             if (vCodec === 'h264_vaapi') {
                 if (needsScale) {
-                    outputOptions.push('-vf', `format=nv12,hwupload,scale_vaapi=w=-2:h=${quality.replace('p', '')}`);
+                    outputOptions.push('-vf', `format=nv12,hwupload,scale_vaapi=w=-2:h=${targetHeight}`);
                 } else {
-                    // 원본 화질일 경우 스케일링 없이 픽셀 포맷 맞춤 및 하드웨어 업로드
+                    // 원본 화질일 때 픽셀 포맷 변환 및 하드웨어 업로드
                     outputOptions.push('-vf', 'format=nv12,hwupload');
                 }
             } else {
                 if (needsScale) {
-                    outputOptions.push('-vf', `scale=-2:${quality.replace('p', '')}`);
+                    outputOptions.push('-vf', `scale=-2:${targetHeight}`);
+                }
+            }
+
+            if (targetBitrate && vCodec !== 'copy') {
+                outputOptions.push('-b:v', targetBitrate);
+                outputOptions.push('-maxrate', targetBitrate);
+                const bitVal = parseInt(targetBitrate.replace('M', ''));
+                if (!isNaN(bitVal)) {
+                    outputOptions.push('-bufsize', `${bitVal * 2}M`);
                 }
             }
 
