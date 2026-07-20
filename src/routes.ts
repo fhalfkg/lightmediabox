@@ -460,6 +460,16 @@ router.get('/hls/:id/:quality/index.m3u8', (req, res) => {
 
     // 타임아웃 갱신
     const streamKey = getStreamKey(id, quality);
+    
+    // 사용자가 화질을 변경했을 때, 동일한 비디오에 대해 백그라운드에서 돌아가고 있는 다른 화질의 인코딩 프로세스를 즉각 종료
+    for (const key of Object.keys(activeStreams)) {
+        if (key.startsWith(`${id}_`) && key !== streamKey) {
+            console.log(`[화질 변경 감지] 자원 확보를 위해 기존 인코딩 강제 종료: ${key}`);
+            const oldQuality = key.substring(id.toString().length + 1);
+            cleanupStream(id, oldQuality);
+        }
+    }
+
     if (!activeStreams[streamKey]) activeStreams[streamKey] = {};
     if (activeStreams[streamKey].timeout) clearTimeout(activeStreams[streamKey].timeout);
     activeStreams[streamKey].timeout = setTimeout(() => cleanupStream(id, quality), SESSION_TIMEOUT_MS);
