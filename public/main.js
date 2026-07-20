@@ -426,7 +426,7 @@ function renderVideoChunk() {
 
         let thumbHtml = `<div class="fallback-icon">${video.type === 'image' ? '🖼️' : '🎬'}</div>`;
         if (video.thumbnail_url) {
-            thumbHtml += `<img class="thumb-bg" src="${video.thumbnail_url}?v=1" alt="thumbnail" onerror="this.parentElement.classList.add('no-thumb');">`;
+            thumbHtml += `<img class="thumb-bg" src="${video.thumbnail_url}?v=1" alt="thumbnail" loading="lazy" decoding="async" onerror="this.parentElement.classList.add('no-thumb');">`;
         } else {
             card.classList.add('no-thumb');
         }
