@@ -48,35 +48,49 @@ const checkEncoder = async (codec: string): Promise<boolean> => {
     });
 };
 
-const cleanupStream = (id: string, quality?: string) => {
+const cleanupStream = (id: string, quality?: string, deleteFiles: boolean = true) => {
     if (quality) {
-        // 특정 화질만 정리
+        // 특정 화질 정리
         const key = getStreamKey(id, quality);
         const stream = activeStreams[key];
         if (stream) {
-            if (stream.command) stream.command.kill('SIGKILL');
-            clearTimeout(stream.timeout);
-            delete activeStreams[key];
+            if (stream.command) {
+                stream.command.kill('SIGKILL');
+                delete stream.command;
+            }
+            if (deleteFiles) {
+                clearTimeout(stream.timeout);
+                delete activeStreams[key];
+            }
         }
-        const outDir = path.join(HLS_TEMP_DIR, id.toString(), quality);
-        if (fs.existsSync(outDir)) {
-            fs.rmSync(outDir, { recursive: true, force: true });
-            console.log(`🗑️ [ID: ${id}] ${quality} 임시 HLS 파일 정리 완료`);
+        if (deleteFiles) {
+            const outDir = path.join(HLS_TEMP_DIR, id.toString(), quality);
+            if (fs.existsSync(outDir)) {
+                fs.rmSync(outDir, { recursive: true, force: true });
+                console.log(`🧹 [ID: ${id}] ${quality} 임시 HLS 파일 정리 완료`);
+            }
         }
     } else {
         // 해당 비디오의 모든 화질 정리
         for (const key of Object.keys(activeStreams)) {
             if (key.startsWith(`${id}_`)) {
                 const stream = activeStreams[key];
-                if (stream.command) stream.command.kill('SIGKILL');
-                clearTimeout(stream.timeout);
-                delete activeStreams[key];
+                if (stream.command) {
+                    stream.command.kill('SIGKILL');
+                    delete stream.command;
+                }
+                if (deleteFiles) {
+                    clearTimeout(stream.timeout);
+                    delete activeStreams[key];
+                }
             }
         }
-        const outDir = path.join(HLS_TEMP_DIR, id.toString());
-        if (fs.existsSync(outDir)) {
-            fs.rmSync(outDir, { recursive: true, force: true });
-            console.log(`🗑️ [ID: ${id}] 임시 HLS 파일 전체 정리 완료`);
+        if (deleteFiles) {
+            const outDir = path.join(HLS_TEMP_DIR, id.toString());
+            if (fs.existsSync(outDir)) {
+                fs.rmSync(outDir, { recursive: true, force: true });
+                console.log(`🧹 [ID: ${id}] 임시 HLS 파일 전체 정리 완료`);
+            }
         }
     }
 };
@@ -448,6 +462,14 @@ router.get('/video/:id/direct', (req, res) => {
     }
 });
 
+// 스트리밍 명시적 종료 API (비디오 플레이어를 닫을 때 호출)
+router.post('/hls/:id/stop', (req, res) => {
+    const { id } = req.params;
+    console.log(`[종료 요청] 비디오 ID: ${id} 인코딩 중지 (임시 폴더는 유지)`);
+    cleanupStream(id, undefined, false);
+    res.sendStatus(200);
+});
+
 // 화질별 HLS 플레이리스트
 router.get('/hls/:id/:quality/index.m3u8', (req, res) => {
     const { id, quality } = req.params;
@@ -461,12 +483,12 @@ router.get('/hls/:id/:quality/index.m3u8', (req, res) => {
     // 타임아웃 갱신
     const streamKey = getStreamKey(id, quality);
     
-    // 사용자가 화질을 변경했을 때, 동일한 비디오에 대해 백그라운드에서 돌아가고 있는 다른 화질의 인코딩 프로세스를 즉각 종료
+    // 사용자가 화질을 변경했을 때, 동일한 비디오에 대해 백그라운드에서 돌아가고 있는 다른 화질의 인코딩 프로세스를 즉각 종료 (폴더는 유지)
     for (const key of Object.keys(activeStreams)) {
         if (key.startsWith(`${id}_`) && key !== streamKey) {
             console.log(`[화질 변경 감지] 자원 확보를 위해 기존 인코딩 강제 종료: ${key}`);
             const oldQuality = key.substring(id.toString().length + 1);
-            cleanupStream(id, oldQuality);
+            cleanupStream(id, oldQuality, false);
         }
     }
 

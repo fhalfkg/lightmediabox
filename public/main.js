@@ -166,11 +166,15 @@ const iconDesc = document.querySelector('.icon-desc');
 function showLibrary() {
     isPlayerMode = false;
     document.body.classList.remove('player-mode');
-    // 플레이어 정리
+    // 플레이어 초기화 및 백그라운드 인코딩 즉시 종료
     if (hls) {
         hls.destroy();
         hls = null;
+        if (currentVideoId) {
+            fetch(`/api/hls/${currentVideoId}/stop`, { method: 'POST' }).catch(() => {});
+        }
     }
+    currentVideoId = null;
     videoPlayer.pause();
     videoPlayer.removeAttribute('src');
     videoPlayer.load();
