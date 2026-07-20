@@ -1646,3 +1646,65 @@ function castCurrentVideo() {
         function (e) { console.error('❌ 크롬캐스트 전송 에러', e); }
     );
 }
+
+// 속도 측정 로직
+const btnStartSpeedTest = document.getElementById('btn-start-speedtest');
+const speedtestResultContainer = document.getElementById('speedtest-result-container');
+const speedtestStatus = document.getElementById('speedtest-status');
+const speedtestProgress = document.getElementById('speedtest-progress');
+const speedtestMbps = document.getElementById('speedtest-mbps');
+
+if (btnStartSpeedTest) {
+    btnStartSpeedTest.addEventListener('click', () => {
+        btnStartSpeedTest.disabled = true;
+        btnStartSpeedTest.textContent = '측정 중...';
+        speedtestResultContainer.style.display = 'block';
+        speedtestStatus.textContent = '데이터 다운로드 중...';
+        speedtestProgress.style.width = '0%';
+        speedtestMbps.innerHTML = '0.0 <span style="font-size: 16px; color: rgba(255,255,255,0.5); font-weight: 400;">Mbps</span>';
+
+        const startTime = performance.now();
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', `/api/speedtest/download?t=${Date.now()}`, true);
+
+        xhr.onprogress = (event) => {
+            if (event.lengthComputable) {
+                const percentComplete = (event.loaded / event.total) * 100;
+                speedtestProgress.style.width = percentComplete + '%';
+
+                const currentTime = performance.now();
+                const durationSeconds = (currentTime - startTime) / 1000;
+                if (durationSeconds > 0) {
+                    const loadedBits = event.loaded * 8;
+                    const mbps = (loadedBits / 1000000) / durationSeconds;
+                    speedtestMbps.innerHTML = `${mbps.toFixed(1)} <span style="font-size: 16px; color: rgba(255,255,255,0.5); font-weight: 400;">Mbps</span>`;
+                }
+            }
+        };
+
+        xhr.onload = () => {
+            btnStartSpeedTest.disabled = false;
+            btnStartSpeedTest.textContent = '다시 측정';
+            if (xhr.status === 200) {
+                speedtestStatus.textContent = '측정 완료';
+                speedtestProgress.style.width = '100%';
+                
+                const endTime = performance.now();
+                const durationSeconds = (endTime - startTime) / 1000;
+                const loadedBits = 50 * 1024 * 1024 * 8;
+                const finalMbps = (loadedBits / 1000000) / durationSeconds;
+                speedtestMbps.innerHTML = `${finalMbps.toFixed(1)} <span style="font-size: 16px; color: rgba(255,255,255,0.5); font-weight: 400;">Mbps</span>`;
+            } else {
+                speedtestStatus.textContent = '측정 실패 (서버 오류)';
+            }
+        };
+
+        xhr.onerror = () => {
+            btnStartSpeedTest.disabled = false;
+            btnStartSpeedTest.textContent = '다시 측정';
+            speedtestStatus.textContent = '네트워크 오류 발생';
+        };
+
+        xhr.send();
+    });
+}

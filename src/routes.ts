@@ -721,4 +721,35 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
     serveFile();
 });
 
+// ⚡ 속도 측정용 더미 다운로드 API
+router.get('/speedtest/download', (req, res) => {
+    // 50MB 크기 전송
+    const size = 50 * 1024 * 1024;
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Length', size.toString());
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    
+    // 네트워크 레벨의 압축(gzip 등)을 방지하기 위해 랜덤 바이트 1MB 버퍼 생성
+    const crypto = require('crypto');
+    const randomBuffer = crypto.randomBytes(1024 * 1024);
+    
+    let bytesWritten = 0;
+    const writeData = () => {
+        let ok = true;
+        while (bytesWritten < size && ok) {
+            const toWrite = Math.min(randomBuffer.length, size - bytesWritten);
+            ok = res.write(randomBuffer.slice(0, toWrite));
+            bytesWritten += toWrite;
+        }
+        if (bytesWritten < size) {
+            res.once('drain', writeData);
+        } else {
+            res.end();
+        }
+    };
+    writeData();
+});
+
 export default router;

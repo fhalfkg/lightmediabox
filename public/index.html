@@ -88,9 +88,10 @@
             <div class="settings-sidebar">
                 <h2>설정</h2>
                 <div class="settings-tabs">
-                    <button class="settings-tab active" data-target="settings-account">계정 정보</button>
+                    <button class="settings-tab active" data-target="settings-account">계정</button>
                     <button class="settings-tab" data-target="settings-library">라이브러리</button>
                     <button class="settings-tab" data-target="settings-transcoding">트랜스코딩</button>
+                    <button class="settings-tab" data-target="settings-speedtest">속도 측정</button>
                 </div>
             </div>
             <div class="settings-main">
@@ -203,9 +204,32 @@
 
                         <div style="margin-top: 24px;">
                             <button class="btn-primary btn-settings-save">변경사항 저장</button>
+                            <div style="margin-top: 16px; font-size: 13px; color: rgba(255,255,255,0.5);">
+                                이 변경 사항은 다음 영상부터 적용됩니다.
+                            </div>
                         </div>
                     </div>
+
+                <!-- 속도 측정 패널 -->
+                <div id="settings-speedtest" class="settings-pane">
+                    <h3>속도 측정</h3>
+                    <div style="margin-top: 16px; font-size: 14px; color: rgba(255,255,255,0.7); line-height: 1.5;">
+                        현재 디바이스와 서버 간의 실제 네트워크 다운로드 속도를 측정합니다.<br>
+                        (측정 중 약 50MB의 데이터가 전송됩니다.)
+                    </div>
+                    <div class="form-group" style="margin-top: 24px;">
+                        <button id="btn-start-speedtest" class="btn-primary" style="width: 100%;">측정 시작</button>
+                    </div>
+                    
+                    <div id="speedtest-result-container" style="display: none; margin-top: 32px; text-align: center;">
+                        <div style="font-size: 13px; color: rgba(255,255,255,0.5); margin-bottom: 8px;" id="speedtest-status">준비 중...</div>
+                        <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; margin-bottom: 16px;">
+                            <div id="speedtest-progress" style="width: 0%; height: 100%; background: #8b5cf6; transition: width 0.2s ease;"></div>
+                        </div>
+                        <div style="font-size: 32px; font-weight: 600; color: #fff;" id="speedtest-mbps">0.0 <span style="font-size: 16px; color: rgba(255,255,255,0.5); font-weight: 400;">Mbps</span></div>
+                    </div>
                 </div>
+            </div>
             </div>
         </div>
     </div>
