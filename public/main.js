@@ -145,6 +145,7 @@ let lastLoadedData = { folders: [], videos: [] };
 let currentRenderLimit = 50;
 const RENDER_CHUNK_SIZE = 50;
 let intersectionObserver = null;
+let imageObserver = null;
 let cachedSortedVideos = [];
 
 if (window.IntersectionObserver) {
@@ -153,6 +154,19 @@ if (window.IntersectionObserver) {
             loadMoreItems();
         }
     }, { rootMargin: '200px' });
+
+    imageObserver = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const img = entry.target;
+                if (img.dataset.src) {
+                    img.src = img.dataset.src;
+                    img.removeAttribute('data-src');
+                }
+                observer.unobserve(img);
+            }
+        });
+    }, { rootMargin: '300px' });
 }
 
 const tabFolder = document.getElementById('tab-folder');
@@ -363,7 +377,7 @@ function renderLibrary() {
                                     <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
                                 </svg>
                             </div>
-                            <img class="thumb-bg" src="${thumbUrl}" alt="folder-thumbnail" loading="lazy" decoding="async" onerror="this.parentElement.classList.add('no-thumb');">
+                            <img class="thumb-bg lazy-image" data-src="${thumbUrl}" alt="folder-thumbnail" onerror="this.parentElement.classList.add('no-thumb');">
                         `;
             }
 
@@ -386,8 +400,16 @@ function renderLibrary() {
                             <div class="card-title">${folder.name}</div>
                         </div>
                     `;
-            card.onclick = () => browsePath(folder.path);
+            card.onclick = () => {
+                browsePath(folder.path);
+            };
+
             libraryGrid.appendChild(card);
+            
+            if (imageObserver) {
+                const lazyImg = card.querySelector('.lazy-image');
+                if (lazyImg) imageObserver.observe(lazyImg);
+            }
         });
     }
 
@@ -426,7 +448,7 @@ function renderVideoChunk() {
 
         let thumbHtml = `<div class="fallback-icon">${video.type === 'image' ? '🖼️' : '🎬'}</div>`;
         if (video.thumbnail_url) {
-            thumbHtml += `<img class="thumb-bg" src="${video.thumbnail_url}?v=1" alt="thumbnail" loading="lazy" decoding="async" onerror="this.parentElement.classList.add('no-thumb');">`;
+            thumbHtml += `<img class="thumb-bg lazy-image" data-src="${video.thumbnail_url}?v=1" alt="thumbnail" onerror="this.parentElement.classList.add('no-thumb');">`;
         } else {
             card.classList.add('no-thumb');
         }
@@ -459,7 +481,13 @@ function renderVideoChunk() {
                 selectVideo(video.id);
             }
         };
+
         libraryGrid.appendChild(card);
+        
+        if (imageObserver) {
+            const lazyImg = card.querySelector('.lazy-image');
+            if (lazyImg) imageObserver.observe(lazyImg);
+        }
     });
 
     if (currentRenderLimit < cachedSortedVideos.length) {
