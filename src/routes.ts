@@ -613,9 +613,8 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
                 inputOptions.push('-hwaccel', 'vaapi', '-hwaccel_device', '/dev/dri/renderD128');
             }
             
-            if (startTime > 0) {
-                inputOptions.push('-ss', String(startTime));
-            }
+            // 시작 시간 지정 (0초일 때도 타임스탬프 영점화를 위해 항상 강제)
+            inputOptions.push('-ss', String(startTime));
 
             const outputOptions = [
                 '-threads', '0', // 멀티코어 인코딩 명시적 활성화
@@ -634,9 +633,7 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
             }
 
             // PTS 시간 동기화 (재생 시간이 리셋되지 않고 startTime부터 시작되도록 강제)
-            if (startTime > 0) {
-                outputOptions.push('-output_ts_offset', String(startTime));
-            }
+            outputOptions.push('-output_ts_offset', String(startTime));
 
             if (vCodec === 'h264_vaapi') {
                 if (needsScale) {
@@ -675,8 +672,8 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
                 outputOptions.push('-sc_threshold', '0');
                 // HLS 탐색 시 깨짐 방지를 위해 반드시 Closed GOP 사용
                 outputOptions.push('-flags', '+cgop');
-                // iOS Safari 프리징 방지: 세그먼트 경계(3초)마다 강제로 키프레임(IDR) 삽입
-                outputOptions.push('-force_key_frames', `expr:gte(t,n_forced*${SEGMENT_TIME})`);
+                // iOS Safari 프리징 방지: 세그먼트 경계(3초)마다 강제로 키프레임(IDR) 삽입 (startTime 보정 포함)
+                outputOptions.push('-force_key_frames', `expr:gte(t,${startTime}+n_forced*${SEGMENT_TIME})`);
                 
                 if (vCodec === 'libx264') {
                     outputOptions.push('-profile:v', 'high');
