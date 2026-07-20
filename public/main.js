@@ -574,8 +574,18 @@ async function selectVideo(id) {
     qualities = data.qualities || [];
     isDirectPlaySupported = data.isDirectPlaySupported || false;
 
-    // 기본 화질: original
-    loadQuality('original');
+    // iOS Safari 등 모바일 환경에서 4K(2160p)를 초과하는 초고화질(6000p 등) 디코딩 시도시 프리징 발생 방지
+    let defaultQuality = 'original';
+    if (isIOS && qualities.length > 0 && qualities[0].height > 2160) {
+        // 4K를 초과하는 경우 가장 높은 안전한 화질(예: 1080p)로 자동 하향
+        const safeQuality = qualities.find(q => q.name !== 'original' && q.height <= 2160);
+        if (safeQuality) {
+            defaultQuality = safeQuality.name;
+            console.log(`⚠️ iOS 기기에서 초고화질 재생 프리징을 방지하기 위해 기본 화질을 ${defaultQuality}로 하향합니다.`);
+        }
+    }
+
+    loadQuality(defaultQuality);
 }
 
 // ─── 화질 로드 (수동 전환 핵심 로직) ───

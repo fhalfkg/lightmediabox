@@ -693,7 +693,7 @@ video {
     right: 0;
     background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
     padding: 40px 16px 12px;
-    z-index: 15;
+    z-index: 30;
     opacity: 0;
     transition: opacity 0.3s ease;
     pointer-events: none;
