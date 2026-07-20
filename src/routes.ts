@@ -555,6 +555,17 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
                 vCodec = 'libx264';
             }
 
+            // 하드웨어 인코더(VCN)는 4K(4096x2160) 초과 해상도(예: 세로 3864px 등)에서 
+            // 극심한 병목이나 실패를 유발하므로 Emby와 동일하게 소프트웨어 처리로 강제 폴백
+            const [origW, origH] = video.resolution ? video.resolution.split('x').map(Number) : [1920, 1080];
+            const originalHeight = isNaN(origH) ? 1080 : origH;
+            const originalWidth = isNaN(origW) ? 1920 : origW;
+            
+            if (vCodec === 'h264_vaapi' && (originalWidth > 4096 || originalHeight > 2160)) {
+                console.log(`⚠️ [ID: ${id}] 해상도(${video.resolution})가 하드웨어 인코딩 한계를 초과하여 libx264로 자동 하향합니다.`);
+                vCodec = 'libx264';
+            }
+
             let aCodec = 'aac';
             if (!needsScale && video.video_codec === 'h264' && video.audio_codec === 'aac') {
                 vCodec = 'copy';
@@ -635,7 +646,8 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
                 .output(path.join(outDir, 'dummy.m3u8'))
                 .on('start', (cmd) => console.log(`✅ [${quality}] 실행 명령어:`, cmd))
                 .on('stderr', (stderr) => {
-                    if (stderr.toLowerCase().includes('error') && !stderr.includes('configuration:')) {
+                    const lowerStderr = stderr.toLowerCase();
+                    if (lowerStderr.includes('error') && !lowerStderr.includes('configuration:') && !lowerStderr.includes('hwaccel initialisation returned error')) {
                         console.error(`❌ [${quality}] FFmpeg 에러:`, stderr);
                     }
                 })
