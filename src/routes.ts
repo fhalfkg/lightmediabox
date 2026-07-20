@@ -675,6 +675,12 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
                 outputOptions.push('-sc_threshold', '0');
                 // HLS 탐색 시 깨짐 방지를 위해 반드시 Closed GOP 사용
                 outputOptions.push('-flags', '+cgop');
+                // iOS Safari 프리징 방지: 세그먼트 경계(3초)마다 강제로 키프레임(IDR) 삽입
+                outputOptions.push('-force_key_frames', `expr:gte(t,n_forced*${SEGMENT_TIME})`);
+                
+                if (vCodec === 'libx264') {
+                    outputOptions.push('-profile:v', 'high');
+                }
             }
 
             const command = ffmpeg(video.file_path)
