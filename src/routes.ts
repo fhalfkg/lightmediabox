@@ -741,7 +741,11 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
                     if (!err.message.includes('SIGKILL')) {
                         console.error(`❌ [${quality}] 인코딩 실패:`, err.message);
                     }
-                    if (activeStreams[streamKey]) {
+                    // SIGKILL은 비동기로 뒤늦게 도착할 수 있으므로, 그 사이 다른 요청이 이미
+                    // 새 인코더로 교체했다면(activeStreams[streamKey].command !== command) 절대 건드리지 않음.
+                    // 그렇지 않으면 방금 죽은(과거) 프로세스의 뒤늦은 에러 이벤트가 현재 정상 실행 중인
+                    // 인코더의 참조를 잘못 삭제해 불필요한 추가 재실행을 유발함.
+                    if (activeStreams[streamKey]?.command === command) {
                         delete activeStreams[streamKey].command;
                     }
                 })
