@@ -22,9 +22,10 @@ if (!fs.existsSync(HLS_TEMP_DIR)) fs.mkdirSync(HLS_TEMP_DIR, { recursive: true }
 const activeStreams: Record<string, { 
     command?: ffmpeg.FfmpegCommand; 
     timeout?: NodeJS.Timeout; 
-    currentSeq?: number; 
+    currentSeq?: number;
     startTime?: number;
     launching?: boolean;
+    coldStart?: boolean;
 }> = {};
 const SESSION_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -557,7 +558,19 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
             isSequential = true;
         } else if (seq < currentSeq) {
             // 현재 실행 중인 FFmpeg 시작점보다 과거 조각을 요청 (뒤로 탐색)
-            isSequential = false;
+            // 단, 스트림을 방금 막 새로 시작한(coldStart) 직후 아주 짧은 유예 시간 내라면
+            // 예외적으로 무시한다. Edge/iOS Safari 네이티브 HLS 엔진이 화질 변경 시 정확한
+            // 목표 위치로 먼저 정상 요청한 뒤, 곧바로 훨씬 이전 시점을 스스로 한 번 더
+            // 요청하는 현상이 관찰됨 — 이걸 즉시 재시작으로 처리하면 방금 정확히 시작된
+            // 인코더를 죽이고 엉뚱한 지점부터 다시 인코딩하게 되어 오히려 버퍼링을 유발함.
+            // 이미 한동안 돌고 있던 스트림에 대한 일반적인 되감기 탐색에는 영향 없음
+            // (coldStart는 최초 실행 시에만 true이고, 이후 재시작부터는 false로 꺼짐).
+            const coldStartGraceMs = 1500;
+            if (activeStreams[streamKey].coldStart && timeSinceStart < coldStartGraceMs) {
+                isSequential = true;
+            } else {
+                isSequential = false;
+            }
         } else {
             // 현재 FFmpeg가 어디까지 생성했는지 확인
             let latestSeq = currentSeq;
@@ -586,7 +599,8 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
             activeStreams[streamKey].command.kill('SIGKILL');
             delete activeStreams[streamKey].command;
             activeStreams[streamKey].launching = false;
-            
+            activeStreams[streamKey].coldStart = false; // 한 번이라도 재시작을 거치면 더 이상 "막 시작한" 상태가 아님
+
             // 이전 상태가 담긴 dummy.m3u8 삭제 (동시 요청 레이스 컨디션 방지)
             const dummyM3u8Path = path.join(outDir, 'dummy.m3u8');
             if (fs.existsSync(dummyM3u8Path)) {
@@ -597,6 +611,9 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
         // 인코딩 시작 (launching 플래그로 await 중 동시 진입 방지)
         if (!activeStreams[streamKey]?.command && !activeStreams[streamKey]?.launching) {
             if (!activeStreams[streamKey]) activeStreams[streamKey] = {};
+            // 이 streamKey에 대해 한 번도 인코더가 실행된 적이 없는 진짜 최초 실행일 때만
+            // coldStart를 켠다 (위쪽 탐색 감지 로직의 유예 시간 보호 대상 판별용).
+            activeStreams[streamKey].coldStart = activeStreams[streamKey].currentSeq === undefined;
             activeStreams[streamKey].launching = true;
 
             const startTime = seq * SEGMENT_TIME;
