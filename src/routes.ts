@@ -24,6 +24,7 @@ const activeStreams: Record<string, {
     timeout?: NodeJS.Timeout; 
     currentSeq?: number; 
     startTime?: number;
+    launching?: boolean;
 }> = {};
 const SESSION_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -574,6 +575,7 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
             console.log(`🚀 탐색 감지됨: 기존 인코더 종료 및 seq=${seq} 부터 재시작`);
             activeStreams[streamKey].command.kill('SIGKILL');
             delete activeStreams[streamKey].command;
+            activeStreams[streamKey].launching = false;
             
             // 이전 상태가 담긴 dummy.m3u8 삭제 (동시 요청 레이스 컨디션 방지)
             const dummyM3u8Path = path.join(outDir, 'dummy.m3u8');
@@ -582,9 +584,10 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
             }
         }
 
-        // 인코딩 시작
-        if (!activeStreams[streamKey]?.command) {
+        // 인코딩 시작 (launching 플래그로 await 중 동시 진입 방지)
+        if (!activeStreams[streamKey]?.command && !activeStreams[streamKey]?.launching) {
             if (!activeStreams[streamKey]) activeStreams[streamKey] = {};
+            activeStreams[streamKey].launching = true;
 
             const startTime = seq * SEGMENT_TIME;
             console.log(`🎬 [ID: ${id}] ${quality} 화질 인코딩 시작 (seq=${seq}, time=${startTime}s)`);
@@ -749,6 +752,7 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
             activeStreams[streamKey].command = command;
             activeStreams[streamKey].currentSeq = seq;
             activeStreams[streamKey].startTime = Date.now();
+            activeStreams[streamKey].launching = false;
             command.run();
         }
     }
