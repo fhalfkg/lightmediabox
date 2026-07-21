@@ -702,10 +702,16 @@ function loadQuality(quality) {
             startPosition: savedTime > 0 ? savedTime : -1,
             maxBufferLength: 30,
             maxMaxBufferLength: 60,
-            maxBufferHole: 30,
-            maxSeekHole: 30,
+            maxBufferHole: 0.5,
+            maxSeekHole: 2,
             enableWorker: true,
-            lowLatencyMode: false
+            lowLatencyMode: false,
+            fragLoadingTimeOut: 30000,
+            fragLoadingMaxRetry: 6,
+            fragLoadingRetryDelay: 1000,
+            levelLoadingTimeOut: 15000,
+            levelLoadingMaxRetry: 4,
+            startFragPrefetch: true,
         });
         hls.loadSource(m3u8Url);
         hls.attachMedia(videoPlayer);
@@ -724,12 +730,39 @@ function loadQuality(quality) {
 
         hls.on(Hls.Events.ERROR, (event, data) => {
             if (data.fatal) {
-                console.error('HLS 치명적 오류:', data);
-                hideLoading();
+                switch (data.type) {
+                    case Hls.ErrorTypes.NETWORK_ERROR:
+                        console.warn('HLS 네트워크 오류, 자동 복구 시도...');
+                        hls.startLoad();
+                        break;
+                    case Hls.ErrorTypes.MEDIA_ERROR:
+                        console.warn('HLS 미디어 오류, 자동 복구 시도...');
+                        hls.recoverMediaError();
+                        break;
+                    default:
+                        console.error('HLS 치명적 오류:', data);
+                        hideLoading();
+                        break;
+                }
             }
         });
     }
 }
+
+// ─── 버퍼링 상태 감지 (로딩 인디케이터 자동 표시) ───
+videoPlayer.addEventListener('waiting', () => {
+    if (isPlayerMode && currentVideoId) {
+        showLoading('버퍼링 중...');
+    }
+});
+videoPlayer.addEventListener('playing', () => {
+    hideLoading();
+});
+videoPlayer.addEventListener('stalled', () => {
+    if (isPlayerMode && currentVideoId) {
+        showLoading('데이터 대기 중...');
+    }
+});
 
 // ─── 화질 메뉴 ───
 function updateQualityMenu() {

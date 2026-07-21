@@ -508,6 +508,8 @@ router.get('/hls/:id/:quality/index.m3u8', (req, res) => {
     m3u8 += "#EXT-X-ENDLIST\n";
 
     res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+    res.setHeader('Cache-Control', 'no-cache, no-store');
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.send(m3u8);
 });
 
@@ -753,16 +755,20 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
 
     // TS 조각이 완전히 생성되었는지 확인하는 함수
     const isSegmentReady = () => {
+        // 빠른 경로: 파일이 존재하면 대부분의 경우 완료된 것
+        // (hls_flags temp_file 덕분에 .tmp → .ts 리네임 완료 = 100% 완성)
+        if (!fs.existsSync(filePath)) return false;
+
         // 인코딩 명령어가 없으면 캐시된 파일이므로 존재하기만 하면 완료된 것으로 간주
-        if (!activeStreams[streamKey]?.command) return fs.existsSync(filePath);
+        if (!activeStreams[streamKey]?.command) return true;
 
         // 만약 요청한 조각이 현재 실행 중인 FFmpeg의 시작 번호보다 이전 것이라면, 
         // 이는 과거의 인코딩으로 이미 100% 완료된 파일이므로 dummy.m3u8을 확인할 필요 없이 바로 반환
         if (activeStreams[streamKey].currentSeq !== undefined && seq < activeStreams[streamKey].currentSeq) {
-            return fs.existsSync(filePath);
+            return true;
         }
 
-        // FFmpeg가 아직 인코딩 중이라면 dummy.m3u8에 파일 이름이 쓰여졌는지 확인 (쓰여졌다면 해당 조각은 100% 완료된 것)
+        // FFmpeg가 현재 인코딩 중인 최신 세그먼트: dummy.m3u8에 파일 이름이 쓰여졌는지 확인
         const dummyM3u8Path = path.join(outDir, 'dummy.m3u8');
         if (fs.existsSync(dummyM3u8Path)) {
             try {
@@ -774,21 +780,27 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
         return false;
     };
 
-    // 파일 생성 대기 (폴링)
+    // TS 세그먼트 응답 헤더 설정 및 전송
+    const sendSegment = () => {
+        res.setHeader('Content-Type', 'video/MP2T');
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.sendFile(filePath);
+    };
+
+    // 파일 생성 대기 (폴링 — 100ms 간격으로 빠르게 체크)
     const serveFile = () => {
         if (isSegmentReady()) {
-            res.setHeader('Cache-Control', 'public, max-age=3600');
-            return res.sendFile(filePath);
+            return sendSegment();
         }
         
         let attempts = 0;
-        const maxAttempts = 100; // 100 * 300ms = 30초 대기
+        const maxAttempts = 300; // 300 * 100ms = 30초 대기
         
         const checkFileExists = setInterval(() => {
             if (isSegmentReady()) {
                 clearInterval(checkFileExists);
-                res.setHeader('Cache-Control', 'public, max-age=3600');
-                res.sendFile(filePath);
+                sendSegment();
             } else {
                 attempts++;
                 if (attempts >= maxAttempts) {
@@ -796,7 +808,7 @@ router.get('/hls/:id/:quality/:file', async (req, res) => {
                     if (!res.headersSent) res.status(500).send('스트리밍 준비 시간 초과');
                 }
             }
-        }, 300);
+        }, 100);
     };
 
     serveFile();
