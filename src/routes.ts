@@ -79,6 +79,7 @@ const cleanupStream = (id: string, quality?: string, deleteFiles: boolean = true
             if (key.startsWith(`${id}_`)) {
                 const stream = activeStreams[key];
                 if (stream.command) {
+                    console.log(`🛑 [ID: ${id}] 자원 확보를 위해 기존 인코더 프로세스 강제 종료: ${key}`);
                     stream.command.kill('SIGKILL');
                     delete stream.command;
                 }
@@ -438,6 +439,7 @@ router.get('/video/:id/direct', (req, res) => {
     if (!video || !fs.existsSync(video.file_path)) return res.status(404).send('비디오를 찾을 수 없습니다.');
 
     // Direct Play 전환 시 백그라운드에서 실행 중이던 이전 화질의 인코딩 프로세스를 즉각 종료 (자원 확보)
+    console.log(`⚡ Direct Play (원본) 스트리밍 시작: 비디오 ID ${id}`);
     cleanupStream(id, undefined, false);
 
     const stat = fs.statSync(video.file_path);
