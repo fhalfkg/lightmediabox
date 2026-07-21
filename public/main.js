@@ -763,6 +763,16 @@ videoPlayer.addEventListener('stalled', () => {
         showLoading('데이터 대기 중...');
     }
 });
+// stalled는 MSE(hls.js) 재생에서 실제로는 멀쩡히 재생 중인데도 브라우저가
+// 오탐지로 발생시키는 경우가 흔함. 이 경우 영상이 멈추지 않으므로 playing
+// 이벤트가 다시 발동하지 않아 블러가 계속 고착되는 문제가 있었음.
+// timeupdate가 발생한다는 건 재생 시간이 실제로 흐르고 있다는 확실한 증거이므로
+// 안전장치로 여기서도 로딩 오버레이를 해제한다.
+videoPlayer.addEventListener('timeupdate', () => {
+    if (!videoPlayer.paused && !videoPlayer.seeking) {
+        hideLoading();
+    }
+});
 
 // ─── 화질 메뉴 ───
 function updateQualityMenu() {
