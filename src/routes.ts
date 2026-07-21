@@ -437,6 +437,9 @@ router.get('/video/:id/direct', (req, res) => {
     const video: any = db.prepare('SELECT * FROM videos WHERE id = ?').get(id);
     if (!video || !fs.existsSync(video.file_path)) return res.status(404).send('비디오를 찾을 수 없습니다.');
 
+    // Direct Play 전환 시 백그라운드에서 실행 중이던 이전 화질의 인코딩 프로세스를 즉각 종료 (자원 확보)
+    cleanupStream(id, undefined, false);
+
     const stat = fs.statSync(video.file_path);
     const fileSize = stat.size;
     const range = req.headers.range;
