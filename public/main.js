@@ -128,6 +128,12 @@ let currentVideoId = null;
 let currentQuality = null;
 let qualities = [];
 let isDirectPlaySupported = false;
+// 화질을 연달아 빠르게 전환하면, 이전 loadQuality() 호출의 canplay/loadedmetadata
+// 리스너가 아직 안 끝난 채로 새 호출이 시작될 수 있음. 리스너를 addEventListener로만
+// 등록하면 이전 것이 제거되지 않고 남아있다가 나중에 발동해 오래된(stale) savedTime을
+// 잘못 적용하는 문제가 있었음. 매 loadQuality() 호출마다 토큰을 새로 발급하고, 콜백
+// 실행 시점에 자신의 토큰이 최신인지 확인해 오래된 콜백을 무시하도록 한다.
+let qualityLoadToken = 0;
 let controlsTimeout = null;
 let isSeeking = false;
 let currentBrowsePath = '';
@@ -637,6 +643,7 @@ async function selectVideo(id) {
 
 // ─── 화질 로드 (수동 전환 핵심 로직) ───
 function loadQuality(quality) {
+    const myLoadToken = ++qualityLoadToken;
     const savedTime = videoPlayer.currentTime || 0;
     const wasPaused = videoPlayer.paused;
 
@@ -667,29 +674,38 @@ function loadQuality(quality) {
 
         // 실제 재생 가능해지면 로딩 해제
         const onCanPlay = () => {
-            hideLoading();
             videoPlayer.removeEventListener('canplay', onCanPlay);
+            if (myLoadToken !== qualityLoadToken) return; // 더 최신 화질 전환이 이미 시작됨
+            hideLoading();
         };
         videoPlayer.addEventListener('canplay', onCanPlay);
         return;
     }
 
     // HLS 트랜스코딩 / 리먹싱 (Direct Play가 불가능하거나 480p 등을 선택한 경우)
-    const m3u8Url = `/api/hls/${currentVideoId}/${quality}/index.m3u8?token=${window.streamToken || ''}`;
+    // startTime을 서버에 전달하면 플레이리스트에 #EXT-X-START가 포함되어, 플레이어가
+    // 0초 세그먼트를 거쳐가지 않고 처음부터 재생 위치의 세그먼트를 요청하게 된다.
+    const m3u8Url = `/api/hls/${currentVideoId}/${quality}/index.m3u8?token=${window.streamToken || ''}${savedTime > 0 ? `&startTime=${savedTime}` : ''}`;
 
     // Safari(Mac/iOS)의 경우 네이티브 HLS 지원이 훨씬 안정적이므로 최우선으로 사용합니다.
     if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
         videoPlayer.src = m3u8Url;
-        if (savedTime > 0) {
-            videoPlayer.currentTime = savedTime;
-        }
         videoPlayer.load();
 
-        // Safari 네이티브의 경우 canplay 혹은 loadedmetadata 이후 재생 시도
+        // load() 직후 currentTime을 지정하면 load()의 미디어 엘리먼트 초기화 과정에서
+        // 재생 위치가 강제로 0으로 리셋되어버림(HTML5 스펙 동작). 그래서 반드시
+        // load() 이후, 메타데이터가 준비된 시점(loadedmetadata/canplay)에 지정해야 함.
+        // (예전 코드는 load() 호출 직전에 currentTime을 설정해서 항상 0으로 초기화된 뒤
+        // 시작 → seq=0부터 인코딩이 시작되는 원인이었음. Windows Edge는 네이티브 HLS를
+        // "maybe"로 지원하므로 이 브랜치를 탄다.)
         const onNativeCanPlay = () => {
-            hideLoading();
             videoPlayer.removeEventListener('canplay', onNativeCanPlay);
             videoPlayer.removeEventListener('loadedmetadata', onNativeCanPlay);
+            if (myLoadToken !== qualityLoadToken) return; // 더 최신 화질 전환이 이미 시작됨 — 오래된 savedTime 적용 방지
+            hideLoading();
+            if (savedTime > 0) {
+                videoPlayer.currentTime = savedTime;
+            }
             if (!wasPaused || savedTime === 0) {
                 videoPlayer.play().catch(() => { });
             }
@@ -717,6 +733,7 @@ function loadQuality(quality) {
         hls.attachMedia(videoPlayer);
 
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            if (myLoadToken !== qualityLoadToken) return; // 더 최신 화질 전환이 이미 시작됨
             // startPosition 옵션만 믿으면, hls.js가 내부적으로 seek를 적용하기 전에
             // play()가 먼저 실행되어 브라우저가 기본 위치(0초)의 프래그먼트도 함께
             // 요청하는 경우가 있었음 (예: 9초 지점에서 화질 변경 시 seq=3과 seq=0이
@@ -732,8 +749,9 @@ function loadQuality(quality) {
         });
 
         const onCanPlay = () => {
-            hideLoading();
             videoPlayer.removeEventListener('canplay', onCanPlay);
+            if (myLoadToken !== qualityLoadToken) return;
+            hideLoading();
         };
         videoPlayer.addEventListener('canplay', onCanPlay);
 
@@ -759,28 +777,57 @@ function loadQuality(quality) {
 }
 
 // ─── 버퍼링 상태 감지 (로딩 인디케이터 자동 표시) ───
+// waiting/stalled는 실제로는 재생이 끊기지 않았는데도 아주 짧게(오탐지) 발동하는
+// 경우가 흔함(특히 MSE/hls.js 재생). 발동 즉시 오버레이를 띄우면 정상 재생 중에도
+// 화면이 번쩍이므로, 살짝(200ms) 지연시켜 그 사이 playing/timeupdate로 정상 재생이
+// 확인되면 아예 표시하지 않고, 진짜로 버퍼링이 지속될 때만 오버레이를 띄운다.
+let loadingShowTimer = null;
+function scheduleShowLoading(text) {
+    if (loadingShowTimer) return;
+    loadingShowTimer = setTimeout(() => {
+        loadingShowTimer = null;
+        showLoading(text);
+    }, 200);
+}
+function cancelScheduledLoading() {
+    if (loadingShowTimer) {
+        clearTimeout(loadingShowTimer);
+        loadingShowTimer = null;
+    }
+}
+
 videoPlayer.addEventListener('waiting', () => {
-    if (isPlayerMode && currentVideoId) {
-        showLoading('버퍼링 중...');
+    // 일시정지 상태에서는 waiting이 반복적으로 발동할 수 있는데, 그때마다 예약을 걸면
+    // pause 핸들러가 한 번 해제해도 다시 떠버려 고착된 것처럼 보임. 일시정지는 사용자가
+    // 의도한 상태이므로 애초에 예약 자체를 하지 않는다.
+    if (isPlayerMode && currentVideoId && !videoPlayer.paused) {
+        scheduleShowLoading('버퍼링 중...');
     }
 });
 videoPlayer.addEventListener('playing', () => {
+    cancelScheduledLoading();
     hideLoading();
 });
 videoPlayer.addEventListener('stalled', () => {
-    if (isPlayerMode && currentVideoId) {
-        showLoading('데이터 대기 중...');
+    if (isPlayerMode && currentVideoId && !videoPlayer.paused) {
+        scheduleShowLoading('데이터 대기 중...');
     }
 });
-// stalled는 MSE(hls.js) 재생에서 실제로는 멀쩡히 재생 중인데도 브라우저가
-// 오탐지로 발생시키는 경우가 흔함. 이 경우 영상이 멈추지 않으므로 playing
-// 이벤트가 다시 발동하지 않아 블러가 계속 고착되는 문제가 있었음.
-// timeupdate가 발생한다는 건 재생 시간이 실제로 흐르고 있다는 확실한 증거이므로
-// 안전장치로 여기서도 로딩 오버레이를 해제한다.
+// timeupdate가 발생한다는 건 재생 시간이 실제로 흐르고 있다는 확실한 증거이므로,
+// 예약된 표시를 취소하고(아직 안 떴다면 번쩍임 자체를 방지) 이미 떠 있다면 해제한다.
 videoPlayer.addEventListener('timeupdate', () => {
     if (!videoPlayer.paused && !videoPlayer.seeking) {
+        cancelScheduledLoading();
         hideLoading();
     }
+});
+// 일시정지 상태에서는 playing/timeupdate가 발생하지 않으므로, 일시정지 직전/중에
+// waiting이나 stalled가 한 번이라도 발동했다면 오버레이가 해제될 방법이 없어 계속
+// 떠 있는 상태로 고착되는 문제가 있었음. 일시정지는 사용자의 의도된 상태이므로
+// 버퍼링 표시가 필요 없다 — pause 시 예약된 표시를 취소하고 즉시 해제한다.
+videoPlayer.addEventListener('pause', () => {
+    cancelScheduledLoading();
+    hideLoading();
 });
 
 // ─── 화질 메뉴 ───

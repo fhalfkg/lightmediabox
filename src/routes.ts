@@ -501,6 +501,16 @@ router.get('/hls/:id/:quality/index.m3u8', (req, res) => {
     let m3u8 = "#EXTM3U\n#EXT-X-VERSION:3\n";
     m3u8 += `#EXT-X-TARGETDURATION:${SEGMENT_TIME}\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:VOD\n`;
 
+    // 재생 중 화질을 변경한 경우, 클라이언트가 currentTime을 스스로 정정하기 전에
+    // 브라우저(특히 네이티브 HLS 재생기)가 기본값인 0초 세그먼트부터 먼저 요청해버려
+    // 서버가 seq=0으로 인코딩을 시작했다가 곧바로 재생 위치로 재시작하는 낭비가 있었음.
+    // #EXT-X-START:TIME-OFFSET을 명시하면 hls.js/네이티브 플레이어 모두 처음부터
+    // 해당 위치의 세그먼트를 요청하므로 이 낭비가 원천적으로 사라진다.
+    const startTimeParam = parseFloat((req.query.startTime as string) || '');
+    if (!isNaN(startTimeParam) && startTimeParam > 0 && startTimeParam < video.duration) {
+        m3u8 += `#EXT-X-START:TIME-OFFSET=${startTimeParam.toFixed(3)}\n`;
+    }
+
     for (let i = 0; i < totalSegments; i++) {
         const chunkDuration = (i === totalSegments - 1 && video.duration % SEGMENT_TIME !== 0)
             ? video.duration % SEGMENT_TIME : SEGMENT_TIME;
