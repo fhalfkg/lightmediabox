@@ -717,6 +717,15 @@ function loadQuality(quality) {
         hls.attachMedia(videoPlayer);
 
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            // startPosition 옵션만 믿으면, hls.js가 내부적으로 seek를 적용하기 전에
+            // play()가 먼저 실행되어 브라우저가 기본 위치(0초)의 프래그먼트도 함께
+            // 요청하는 경우가 있었음 (예: 9초 지점에서 화질 변경 시 seq=3과 seq=0이
+            // 거의 동시에 요청되어 서버가 "탐색 감지"로 오인, 불필요한 재시작 발생).
+            // Direct Play/Safari 네이티브 분기와 동일하게 currentTime을 명시적으로
+            // 지정해 정상적인 seek 경로를 강제한다.
+            if (savedTime > 0) {
+                videoPlayer.currentTime = savedTime;
+            }
             if (!wasPaused || savedTime === 0) {
                 videoPlayer.play().catch(() => { });
             }
