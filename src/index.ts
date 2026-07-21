@@ -60,7 +60,21 @@ app.use('/api', (req, res, next) => {
     return res.status(401).json({ error: '인증이 필요합니다.' });
 });
 
-app.use(express.static(path.join(process.cwd(), 'public')));
+// index.html은 항상 최신 상태를 받아야 그 안의 main.js?v=N / styles.css?v=N 링크가
+// 최신 버전을 가리킬 수 있음(iOS Safari가 유독 정적 파일 캐시를 공격적으로 유지해
+// 배포 후에도 예전 CSS/JS가 계속 표시되는 문제가 반복됐음). 반대로 main.js/styles.css는
+// 내용이 바뀔 때마다 우리가 수동으로 ?v=N 쿼리를 올려 URL 자체를 바꾸므로, 특정 버전의
+// 내용은 영원히 바뀌지 않는다는 게 보장됨 — 그래서 영구 캐시해도 안전하고, 오히려 이렇게
+// 해야 배포 후에도 사용자가 수동으로 캐시를 지울 필요 없이 항상 최신 파일을 받게 된다.
+app.use(express.static(path.join(process.cwd(), 'public'), {
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('index.html')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        } else if (filePath.endsWith('main.js') || filePath.endsWith('styles.css')) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
+    }
+}));
 
 // 일반 API 라우터 등록
 app.use('/api', routes);
