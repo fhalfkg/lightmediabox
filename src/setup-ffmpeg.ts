@@ -21,7 +21,6 @@ export const getFfmpegPath = () => {
         for (const p of systemJellyfin) {
             if (fs.existsSync(p)) return p;
         }
-        return 'ffmpeg';
     }
     return localPath;
 };
@@ -38,7 +37,6 @@ export const getFfprobePath = () => {
         for (const p of systemJellyfin) {
             if (fs.existsSync(p)) return p;
         }
-        return 'ffprobe';
     }
     return localPath;
 };
@@ -103,6 +101,7 @@ export const setupFfmpeg = async () => {
     const localFfmpeg = path.join(FFMPEG_DIR, ffmpegBinName);
     const localFfprobe = path.join(FFMPEG_DIR, ffprobeBinName);
 
+    // 1. 이미 다운로드된 로컬 jellyfin-ffmpeg 확인
     if (fs.existsSync(localFfmpeg) && fs.existsSync(localFfprobe)) {
         console.log('✅ 로컬 jellyfin-ffmpeg 및 ffprobe를 사용합니다.');
         resolvedFfmpegPath = localFfmpeg;
@@ -110,32 +109,25 @@ export const setupFfmpeg = async () => {
         return;
     }
 
+    // 2. Linux 시스템 패키지로 설치된 jellyfin-ffmpeg 확인 (/usr/lib/jellyfin-ffmpeg/ 또는 /usr/bin/jellyfin-ffmpeg)
     if (platform !== 'win32') {
-        // 시스템 jellyfin-ffmpeg 확인
-        const systemJellyfinFfmpeg = '/usr/lib/jellyfin-ffmpeg/ffmpeg';
-        const systemJellyfinFfprobe = '/usr/lib/jellyfin-ffmpeg/ffprobe';
-        if (fs.existsSync(systemJellyfinFfmpeg) && fs.existsSync(systemJellyfinFfprobe)) {
-            console.log('🚀 시스템 최적화 jellyfin-ffmpeg 인코더를 사용합니다. (/usr/lib/jellyfin-ffmpeg/)');
-            resolvedFfmpegPath = systemJellyfinFfmpeg;
-            resolvedFfprobePath = systemJellyfinFfprobe;
-            return;
-        }
+        const systemJellyfinFfmpegPaths = ['/usr/lib/jellyfin-ffmpeg/ffmpeg', '/usr/bin/jellyfin-ffmpeg'];
+        const systemJellyfinFfprobePaths = ['/usr/lib/jellyfin-ffmpeg/ffprobe', '/usr/bin/jellyfin-ffprobe'];
 
-        // 일반 시스템 ffmpeg 확인
-        try {
-            execSync('ffmpeg -version', { stdio: 'ignore' });
-            execSync('ffprobe -version', { stdio: 'ignore' });
-            console.log('✅ 시스템 ffmpeg 및 ffprobe를 사용합니다.');
-            resolvedFfmpegPath = 'ffmpeg';
-            resolvedFfprobePath = 'ffprobe';
-            return;
-        } catch (e) {
-            // 시스템에 설치되어 있지 않으면 jellyfin-ffmpeg 8.x 포터블 바이너리 자동 다운로드로 진행
+        for (let i = 0; i < systemJellyfinFfmpegPaths.length; i++) {
+            const ffmpegP = systemJellyfinFfmpegPaths[i];
+            const ffprobeP = systemJellyfinFfprobePaths[i];
+            if (fs.existsSync(ffmpegP) && fs.existsSync(ffprobeP)) {
+                console.log(`🚀 시스템 최적화 jellyfin-ffmpeg 인코더를 사용합니다. (${ffmpegP})`);
+                resolvedFfmpegPath = ffmpegP;
+                resolvedFfprobePath = ffprobeP;
+                return;
+            }
         }
     }
 
-    // jellyfin-ffmpeg 8.x 최신 포터블 바이너리 다운로드
-    console.log(`⬇️ jellyfin-ffmpeg 8.x 포터블 최적화 인코더를 다운로드 중입니다... (${platform})`);
+    // 3. 로컬/시스템에 jellyfin-ffmpeg가 없으면 100% jellyfin-ffmpeg 8.x 포터블 바이너리를 다운로드
+    console.log(`⬇️ jellyfin-ffmpeg 8.x 최적화 포터블 인코더를 다운로드 중입니다... (${platform})`);
     
     if (!fs.existsSync(FFMPEG_DIR)) fs.mkdirSync(FFMPEG_DIR, { recursive: true });
     const extractTempPath = path.join(process.cwd(), 'ffmpeg-temp');
@@ -192,5 +184,5 @@ export const setupFfmpeg = async () => {
 
     resolvedFfmpegPath = localFfmpeg;
     resolvedFfprobePath = localFfprobe;
-    console.log('🚀 jellyfin-ffmpeg 최적화 인코더 설치가 완료되었습니다.');
+    console.log('🚀 jellyfin-ffmpeg 8.x 최적화 인코더 설치가 완료되었습니다.');
 };
